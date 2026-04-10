@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current State
 
-**Phase 1.1 complete** — Android project scaffolded, Gradle wrapper in place, dependencies wired, debug APK builds cleanly. Next up: Phase 1.2 (Room database entities, DAOs, FTS, migrations).
+**Phase 1.2 complete** — Room layer in place: 17 entities (+ `ProductFts` FTS4 mirror of `products`), indexes per spec, all DAOs returning `Flow` for observes (list queries filter `is_archived = 0` where applicable), type converters for enums, `YkfjDatabase` registered with version 1 and empty `autoMigrations`, and `DatabaseSeeder` that inserts the default `admin`/`admin123` user on first launch. Debug APK still builds cleanly. Next up: Phase 1.3 (Hilt DI — `AppModule` provides database + DAOs, `RepositoryModule` binds interfaces, invoke `DatabaseSeeder` from `YkfjApp.onCreate`).
 
 **Always begin a session by reading [docs/project/Implementation-Plan.md](docs/project/Implementation-Plan.md)** to find the next unchecked task. The plan has checkbox-tracked phases; work top-down and mark items as they land.
 

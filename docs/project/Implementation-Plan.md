@@ -13,7 +13,7 @@
 - [x] Configure `AndroidManifest.xml` (minSdk 31, permissions: INTERNET, CAMERA, READ/WRITE_STORAGE, ACCESS_NETWORK_STATE, NSD, FOREGROUND_SERVICE, POST_NOTIFICATIONS)
 
 ### 1.2 Room Database
-- [ ] Create all Room entities (`UserEntity`, `ProductEntity`, `ProductImageEntity`, `MetalRateEntity`, `CategoryEntity`, `CustomerEntity`, `SupplierEntity`, `SoldRecordEntity`, `LayawayRecordEntity`, `LayawayTransactionEntity`, `DamagedRecordEntity`, `PaluwaganGroupEntity`, `PaluwaganSlotEntity`, `PaluwaganPaymentEntity`, `ActivityLogEntity`)
+- [x] Create all Room entities (`UserEntity`, `ProductEntity`, `ProductImageEntity`, `MetalRateEntity`, `CategoryEntity`, `CustomerEntity`, `SupplierEntity`, `SoldRecordEntity`, `LayawayRecordEntity`, `LayawayTransactionEntity`, `DamagedRecordEntity`, `PaluwaganGroupEntity`, `PaluwaganSlotEntity`, `PaluwaganPaymentEntity`, `ActivityLogEntity`)
   - `ProductEntity`: include `supplier_id` (FK → suppliers, nullable) + `date_acquired` (Long, required)
   - `SupplierEntity`: name, representative_name, mobile, address, notes
   - `CustomerEntity`: include `credit_score` (Int, default 100)
@@ -22,7 +22,7 @@
   - `DamagedRecordEntity`: include `recorded_by` (FK → users) + `is_archived` (Boolean, default false)
   - `PaluwaganGroupEntity`: include `is_archived` (Boolean, default false)
   - `ProductImageEntity`: 1 image per product (unique product_id), no display_order
-- [ ] Add `@Index` annotations on all entities for frequently queried columns:
+- [x] Add `@Index` annotations on all entities for frequently queried columns:
   - products: status, category_id, metal_rate_id, updated_at, is_deleted
   - sold_records: sold_date, updated_at
   - layaway_records: status, updated_at
@@ -31,13 +31,13 @@
   - paluwagan_groups: status, updated_at
   - paluwagan_slots: group_id, customer_id
   - paluwagan_payments: group_id, slot_id, round_number, status
-- [ ] Create FTS4 virtual table `ProductFts` for full-text search (name, product_id, notes)
-- [ ] Create `PendingSyncEntity` for offline change queue (phone side)
-- [ ] Create all DAOs (`UserDao`, `ProductDao`, `MetalRateDao`, `CategoryDao`, `CustomerDao`, `SupplierDao`, `SoldRecordDao`, `LayawayRecordDao`, `LayawayTransactionDao`, `DamagedRecordDao`, `ProductImageDao`, `PendingSyncDao`, `PaluwaganGroupDao`, `PaluwaganSlotDao`, `PaluwaganPaymentDao`, `ActivityLogDao`)
-- [ ] DAOs return `Flow<List<T>>` for all observe/list queries (reactive UI) — ensure list queries filter `WHERE is_archived = false` by default
-- [ ] Create `YkfjDatabase.kt` with all entities registered, version = 1, empty `autoMigrations` array (ready for future)
-- [ ] Add Room type converters for enums and dates
-- [ ] Seed default admin user on first launch (username: admin, password: admin123 — document that admin should change password after first login)
+- [x] Create FTS4 virtual table `ProductFts` for full-text search (name, product_id, notes)
+- [x] Create `PendingSyncEntity` for offline change queue (phone side)
+- [x] Create all DAOs (`UserDao`, `ProductDao`, `MetalRateDao`, `CategoryDao`, `CustomerDao`, `SupplierDao`, `SoldRecordDao`, `LayawayRecordDao`, `LayawayTransactionDao`, `DamagedRecordDao`, `ProductImageDao`, `PendingSyncDao`, `PaluwaganGroupDao`, `PaluwaganSlotDao`, `PaluwaganPaymentDao`, `ActivityLogDao`)
+- [x] DAOs return `Flow<List<T>>` for all observe/list queries (reactive UI) — ensure list queries filter `WHERE is_archived = false` by default
+- [x] Create `YkfjDatabase.kt` with all entities registered, version = 1, empty `autoMigrations` array (ready for future)
+- [x] Add Room type converters for enums and dates
+- [x] Seed default admin user on first launch (username: admin, password: admin123 — document that admin should change password after first login)
 
 ### 1.3 Dependency Injection
 - [ ] Create `AppModule.kt` (provides Room database, DAOs)
