@@ -17,9 +17,10 @@
   - `ProductEntity`: include `supplier_id` (FK → suppliers, nullable) + `date_acquired` (Long, required)
   - `SupplierEntity`: name, representative_name, mobile, address, notes
   - `CustomerEntity`: include `credit_score` (Int, default 100)
-  - `SoldRecordEntity`: include `sold_by` (FK → users) + `discount_amount` + `discount_type` (NONE/FIXED/PERCENTAGE)
-  - `LayawayRecordEntity`: include `created_by` (FK → users) + `due_date` (nullable Long) + `completion_date` (nullable Long) + `forfeited_amount` (nullable Double — set to total_paid when CANCELLED)
-  - `DamagedRecordEntity`: include `recorded_by` (FK → users)
+  - `SoldRecordEntity`: include `sold_by` (FK → users) + `discount_amount` + `discount_type` (NONE/FIXED/PERCENTAGE) + `is_archived` (Boolean, default false)
+  - `LayawayRecordEntity`: include `created_by` (FK → users) + `due_date` (nullable Long) + `completion_date` (nullable Long) + `forfeited_amount` (nullable Double — set to total_paid when CANCELLED) + `is_archived` (Boolean, default false)
+  - `DamagedRecordEntity`: include `recorded_by` (FK → users) + `is_archived` (Boolean, default false)
+  - `PaluwaganGroupEntity`: include `is_archived` (Boolean, default false)
   - `ProductImageEntity`: 1 image per product (unique product_id), no display_order
 - [ ] Add `@Index` annotations on all entities for frequently queried columns:
   - products: status, category_id, metal_rate_id, updated_at, is_deleted
@@ -33,7 +34,7 @@
 - [ ] Create FTS4 virtual table `ProductFts` for full-text search (name, product_id, notes)
 - [ ] Create `PendingSyncEntity` for offline change queue (phone side)
 - [ ] Create all DAOs (`UserDao`, `ProductDao`, `MetalRateDao`, `CategoryDao`, `CustomerDao`, `SupplierDao`, `SoldRecordDao`, `LayawayRecordDao`, `LayawayTransactionDao`, `DamagedRecordDao`, `ProductImageDao`, `PendingSyncDao`, `PaluwaganGroupDao`, `PaluwaganSlotDao`, `PaluwaganPaymentDao`, `ActivityLogDao`)
-- [ ] DAOs return `Flow<List<T>>` for all observe/list queries (reactive UI)
+- [ ] DAOs return `Flow<List<T>>` for all observe/list queries (reactive UI) — ensure list queries filter `WHERE is_archived = false` by default
 - [ ] Create `YkfjDatabase.kt` with all entities registered, version = 1, empty `autoMigrations` array (ready for future)
 - [ ] Add Room type converters for enums and dates
 - [ ] Seed default admin user on first launch (username: admin, password: admin123 — document that admin should change password after first login)
@@ -46,6 +47,8 @@
 ### 1.4 Domain Layer Setup
 - [ ] Create domain models (`User`, `Product`, `MetalRate`, `Category`, `Customer`, `Supplier`, etc.)
 - [ ] Create repository interfaces (`UserRepository`, `ProductRepository`, `SupplierRepository`, etc.) — return `Flow<List<T>>` for observe queries
+- [ ] Create `ActivityLogRepository` interface and `LogActivityUseCase`
+- [ ] Create `PendingSyncManager.kt` interface/logic for offline change queueing (called by Repositories)
 - [ ] Create mappers between entities and domain models
 
 ### 1.5 Theme, Navigation & Utilities
@@ -105,7 +108,19 @@
 - [ ] Create `SuppliersScreen.kt` — list with add/edit/delete
 - [ ] Create `SupplierFormDialog.kt` — modal for add/edit (name, representative, mobile, address, notes)
 
-### 2.4 Inventory — Add & Edit Item (Admin Only)
+### 2.4 Customer Directory
+- [ ] Create `CustomerRepository` implementation
+- [ ] Create `AddCustomerUseCase`, `UpdateCustomerUseCase`, `SearchCustomersUseCase`, `GetCustomersUseCase`
+- [ ] Create `CustomersViewModel.kt`
+- [ ] Create `CustomersScreen.kt` — searchable customer list with credit score badges (Excellent/Good/Fair/Poor)
+- [ ] Create `CustomerFormDialog.kt` — add/edit (name, mobile, phone, birthday, address, notes). All roles can add customers. Only Admin/Manager can edit.
+- [ ] Create `CustomerDetailScreen.kt` (admin/manager only) — customer info + transaction history tabs:
+  - Sales tab: all sold_records for this customer
+  - Layaway tab: all layaway_records for this customer
+  - Paluwagan tab: all paluwagan_slots for this customer
+- [ ] Create `CustomerAutoSuggest.kt` — reusable composable for customer selection with auto-suggest
+
+### 2.5 Inventory — Add & Edit Item (Admin Only)
 - [ ] Create `ProductRepository` implementation
 - [ ] Create `ProductIdGenerator.kt` utility (NAME-RATE-CAT-000001 format, sequence scoped per combo)
 - [ ] Create `AddProductUseCase`, `UpdateProductUseCase`
@@ -130,7 +145,7 @@
 - [ ] Create `ImageCompressor.kt` — Compressor library wrapper (configurable target size + dimensions)
 - [ ] Load images via Coil: thumbnails for list cards, full for detail view
 
-### 2.5 Product Detail Screen
+### 2.6 Product Detail Screen
 - [ ] Create `ProductDetailScreen.kt`:
   - Full product info display (all fields, full-size image, supplier, date acquired)
   - Profit margin display (capital vs selling price, margin %) — Admin only
@@ -139,7 +154,7 @@
 - [ ] Create `ProductDetailViewModel.kt`
 - [ ] Navigate from product card tap → detail screen
 
-### 2.6 Inventory — List & Search
+### 2.7 Inventory — List & Search
 - [ ] Create `GetProductsUseCase` with Paging 3 support (returns Flow)
 - [ ] Create `SearchProductsUseCase` using FTS4 table for instant search
 - [ ] Create `InventoryViewModel.kt` with `InventoryUiState` (StateFlow, auto-refreshes via Room Flow)
@@ -155,7 +170,7 @@
   - Status badge (Available, Sold, Layaway, Damaged)
   - Quick info: category, metal rate, quantity
 
-### 2.7 Inventory — Status Changes
+### 2.8 Inventory — Status Changes
 - [ ] Create `MarkAsSoldUseCase` — any role can sell, creates sold_record with quantity (1 to available qty), decreases product quantity, sets SOLD when qty reaches 0
 - [ ] Create `MarkAsLayawayUseCase`
 - [ ] Create `MarkAsDamagedUseCase`
@@ -169,7 +184,8 @@
 - [ ] Create `RevertDialog.kt` — confirmation with mandatory reason field (admin/manager only)
 - [ ] Create `DamagedDialog.kt` — reason input
 
-### 2.8 Phase 2 Testing
+### 2.9 Phase 2 Testing
+- [ ] Unit test: Customer search and auto-suggest logic
 - [ ] Unit test: ProductIdGenerator
 - [ ] Unit test: AddProductUseCase
 - [ ] Unit test: All status change use cases (including quantity decrease logic)
@@ -191,19 +207,7 @@
 
 ## Phase 3 — Sales, Customers & Status Screens (Week 5-6)
 
-### 3.1 Customer Directory
-- [ ] Create `CustomerRepository` implementation
-- [ ] Create `AddCustomerUseCase`, `UpdateCustomerUseCase`, `SearchCustomersUseCase`, `GetCustomersUseCase`
-- [ ] Create `CustomersViewModel.kt`
-- [ ] Create `CustomersScreen.kt` — searchable customer list with credit score badges (Excellent/Good/Fair/Poor)
-- [ ] Create `CustomerFormDialog.kt` — add/edit (name, mobile, phone, birthday, address, notes). All roles can add customers. Only Admin/Manager can edit.
-- [ ] Create `CustomerDetailScreen.kt` (admin/manager only) — customer info + transaction history tabs:
-  - Sales tab: all sold_records for this customer
-  - Layaway tab: all layaway_records for this customer
-  - Paluwagan tab: all paluwagan_slots for this customer
-- [ ] Create `CustomerAutoSuggest.kt` — reusable composable for customer selection with auto-suggest
-
-### 3.2 Sold Archive
+### 3.1 Sold Archive
 - [ ] Create `GetSoldRecordsUseCase` (with date filter, default: today)
 - [ ] Create `RevertSoldUseCase` — admin/manager can revert sold item back to Available (restores qty +1, soft-deletes sold_record)
 - [ ] Create `ExportDailySalesPdfUseCase` — generates password-protected PDF of today's sales
@@ -220,7 +224,7 @@
   - "Export Today's Sales" button → generates password-protected PDF (staff, manager, admin)
   - "Revert to Available" action per item (admin/manager only)
 
-### 3.3 Layaway Management
+### 3.2 Layaway Management
 - [ ] Create `GetActiveLayawaysUseCase`, `AddLayawayPaymentUseCase`, `SplitLayawayPaymentUseCase`, `UpdateLayawayUseCase`, `CompleteLayawayUseCase`, `CancelLayawayUseCase`, `DeleteLayawayPaymentUseCase`
 - [ ] Create `LayawayViewModel.kt`
 - [ ] Create `LayawayScreen.kt`:
@@ -240,7 +244,7 @@
   - Auto-complete layaway when fully paid (sets completion_date)
   - Downpayment is optional — layaway can start with ₱0 paid
 
-### 3.4 Paluwagan (Rotating Savings)
+### 3.3 Paluwagan (Rotating Savings)
 - [ ] Create `PaluwaganGroupEntity`, `PaluwaganSlotEntity`, `PaluwaganPaymentEntity` (Room entities with indexes)
 - [ ] Create `PaluwaganGroupDao`, `PaluwaganSlotDao`, `PaluwaganPaymentDao` (Flow-based queries)
 - [ ] Create `PaluwaganRepository` implementation
@@ -267,7 +271,7 @@
 - [ ] Create `CreatePaluwaganDialog.kt` — group setup form
 - [ ] Create `AddPaluwaganMemberDialog.kt` — customer auto-suggest + position assignment
 
-### 3.5 Damaged Items
+### 3.4 Damaged Items
 - [ ] Create `GetDamagedRecordsUseCase`
 - [ ] Create `RevertDamagedUseCase` — admin/manager can revert damaged item back to Available (restores qty +1, soft-deletes damaged_record)
 - [ ] Create `DamagedViewModel.kt`
@@ -275,8 +279,7 @@
   - List of all damaged items with: product info, reason, date recorded, notes
   - "Revert to Available" action per item (admin/manager only)
 
-### 3.6 Phase 3 Testing
-- [ ] Unit test: Customer search and auto-suggest logic
+### 3.5 Phase 3 Testing
 - [ ] Unit test: Layaway payment calculations (total paid, remaining)
 - [ ] Unit test: Sold archive date filtering
 - [ ] Unit test: Paluwagan round advancement and completion logic
@@ -361,8 +364,7 @@
   - Push local changes (including pending queue) to tablet
   - Update local Room DB with received changes
   - Store last sync timestamp
-- [ ] Create `PendingSyncManager.kt` — offline change queue:
-  - When tablet is unreachable, save changes to `pending_sync_queue` table
+- [ ] Integrate with `PendingSyncManager` (from Phase 1):
   - On reconnect, auto-push all PENDING actions to tablet in order
   - Mark as SYNCED on success, FAILED on error (retry on next sync)
   - Clear SYNCED entries after confirmation
@@ -412,8 +414,6 @@
 - [ ] Hide unauthorized actions in UI (don't just disable — hide)
 
 ### 6.3 Archive Manager
-- [ ] Add `is_archived: Boolean` field to `SoldRecordEntity`, `LayawayRecordEntity`, `PaluwaganGroupEntity`, `DamagedRecordEntity`
-- [ ] Update all list queries to filter `WHERE is_archived = false` by default
 - [ ] Add "Archived" tab/filter to Sold Archive, Layaway, Paluwagan, and Damaged screens
 - [ ] Create `ArchiveRecordUseCase` — sets `is_archived = true` on completed records (admin/manager)
 - [ ] Create `ExportArchiveUseCase` — generates CSV files for archived records by date range
@@ -439,8 +439,7 @@
   - List of available backups on device (auto + manual)
 
 ### 6.5 Activity Log
-- [ ] Create `ActivityLogRepository` implementation
-- [ ] Create `LogActivityUseCase` — called by all use cases to log actions with old/new values
+- [ ] Create `ActivityLogRepository` implementation (from interface in Phase 1)
 - [ ] Create `GetActivityLogsUseCase` — filterable by user, action type, date range
 - [ ] Create `ExportActivityLogUseCase` — CSV export with date range (admin only)
 - [ ] Create `CleanupActivityLogsUseCase` — auto-delete logs older than 90 days (runs on app start)
@@ -451,13 +450,7 @@
   - Each entry shows: timestamp, user, action icon, description
   - Expandable detail: old/new values for edits
   - Export CSV button (admin only)
-- [ ] Integrate logging across all use cases:
-  - Auth: LoginUseCase, logout, session timeout
-  - Products: AddProductUseCase, UpdateProductUseCase, delete
-  - Status: MarkAsSoldUseCase, MarkAsLayawayUseCase, MarkAsDamagedUseCase, RevertStatusUseCase
-  - Payments: AddLayawayPaymentUseCase, SplitLayawayPaymentUseCase, RecordPaluwaganPaymentUseCase
-  - Reference: metal rates, categories, suppliers, customers CRUD
-  - Admin: user management, settings, backup, restore, archive, export
+- [ ] Verify logging integration across all existing use cases (should have been integrated directly during Phases 2-5 development)
 
 ### 6.6 Session & App Info
 - [ ] Add session timeout setting (15 min / 30 min / 1 hour / Never, default 30 min)
