@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Auto-backup is disabled (android:allowBackup="false") so this file is a no-op
+   placeholder required by the manifest reference. We run our own backup system
+   via BackupManager + WorkManager (see Phase 6.4).
+-->
+<full-backup-content />

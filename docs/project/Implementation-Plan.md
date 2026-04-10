@@ -6,11 +6,11 @@
 ## Phase 1 — Project Setup & Foundation (Week 1-2)
 
 ### 1.1 Project Initialization
-- [ ] Create Android project in Android Studio (Kotlin, Compose, Gradle KTS)
-- [ ] Configure `build.gradle.kts` with all dependencies (Room, Hilt, Ktor, Coil, Paging 3, Compressor)
-- [ ] Set up `.gitignore` for Android project
-- [ ] Initialize git repo, create `main` and `develop` branches
-- [ ] Configure `AndroidManifest.xml` (minSdk 31, permissions: INTERNET, CAMERA, READ/WRITE_STORAGE, ACCESS_NETWORK_STATE, NSD, FOREGROUND_SERVICE, POST_NOTIFICATIONS)
+- [x] Create Android project in Android Studio (Kotlin, Compose, Gradle KTS)
+- [x] Configure `build.gradle.kts` with all dependencies (Room, Hilt, Ktor, Coil, Paging 3, Compressor)
+- [x] Set up `.gitignore` for Android project
+- [x] Initialize git repo, create `main` and `develop` branches
+- [x] Configure `AndroidManifest.xml` (minSdk 31, permissions: INTERNET, CAMERA, READ/WRITE_STORAGE, ACCESS_NETWORK_STATE, NSD, FOREGROUND_SERVICE, POST_NOTIFICATIONS)
 
 ### 1.2 Room Database
 - [ ] Create all Room entities (`UserEntity`, `ProductEntity`, `ProductImageEntity`, `MetalRateEntity`, `CategoryEntity`, `CustomerEntity`, `SupplierEntity`, `SoldRecordEntity`, `LayawayRecordEntity`, `LayawayTransactionEntity`, `DamagedRecordEntity`, `PaluwaganGroupEntity`, `PaluwaganSlotEntity`, `PaluwaganPaymentEntity`, `ActivityLogEntity`)
