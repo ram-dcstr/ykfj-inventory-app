@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current State
 
-**Phase 1.2 complete** — Room layer in place: 17 entities (+ `ProductFts` FTS4 mirror of `products`), indexes per spec, all DAOs returning `Flow` for observes (list queries filter `is_archived = 0` where applicable), type converters for enums, `YkfjDatabase` registered with version 1 and empty `autoMigrations`, and `DatabaseSeeder` that inserts the default `admin`/`admin123` user on first launch. Debug APK still builds cleanly. Next up: Phase 1.3 (Hilt DI — `AppModule` provides database + DAOs, `RepositoryModule` binds interfaces, invoke `DatabaseSeeder` from `YkfjApp.onCreate`).
+**Phase 1.6 complete** — Authentication: `PasswordHasher.kt` (bcrypt cost 12), `LoginUseCase.kt` (authenticates + logs activity), `LoginViewModel.kt` with `LoginUiState` sealed interface, `LoginScreen.kt` (username + password with visibility toggle, snackbar errors), `SessionManager.kt` (singleton, `StateFlow<User?>`, configurable idle timeout: 15m/30m/1h/Never, checked every 60s via `LaunchedEffect`, reset on `onUserInteraction`), role-based navigation gating (`Screen.allowedRoles` + `isVisibleTo()` hides unauthorized screens from sidebar). Also created `UserRepositoryImpl` and `ActivityLogRepositoryImpl` with DI bindings to satisfy the login dependency graph. Added `observeFiltered` Flow query to `ActivityLogDao`. Debug APK builds cleanly. Next up: Phase 1.7 (Phase 1 Testing).
 
 **Always begin a session by reading [docs/project/Implementation-Plan.md](docs/project/Implementation-Plan.md)** to find the next unchecked task. The plan has checkbox-tracked phases; work top-down and mark items as they land.
 

@@ -7,6 +7,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.ykfj.inventory.data.local.db.entity.ActivityLogEntity
 import com.ykfj.inventory.data.local.db.enums.ActivityAction
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ActivityLogDao {
@@ -32,6 +33,25 @@ interface ActivityLogDao {
         startMillis: Long,
         endMillis: Long,
     ): PagingSource<Int, ActivityLogEntity>
+
+    @Query(
+        """
+        SELECT * FROM activity_logs
+        WHERE (:userId IS NULL OR user_id = :userId)
+          AND (:action IS NULL OR action = :action)
+          AND (:entityType IS NULL OR entity_type = :entityType)
+          AND (:fromMillis IS NULL OR timestamp >= :fromMillis)
+          AND (:toMillis IS NULL OR timestamp <= :toMillis)
+        ORDER BY timestamp DESC
+        """,
+    )
+    fun observeFiltered(
+        userId: String?,
+        action: ActivityAction?,
+        entityType: String?,
+        fromMillis: Long?,
+        toMillis: Long?,
+    ): Flow<List<ActivityLogEntity>>
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(log: ActivityLogEntity)

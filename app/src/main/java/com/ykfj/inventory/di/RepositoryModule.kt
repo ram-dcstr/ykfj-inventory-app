@@ -1,5 +1,10 @@
 package com.ykfj.inventory.di
 
+import com.ykfj.inventory.data.repository.ActivityLogRepositoryImpl
+import com.ykfj.inventory.data.repository.UserRepositoryImpl
+import com.ykfj.inventory.domain.repository.ActivityLogRepository
+import com.ykfj.inventory.domain.repository.UserRepository
+import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
@@ -8,10 +13,16 @@ import dagger.hilt.components.SingletonComponent
  * Binds repository interfaces (defined in `domain/repository/`) to their
  * implementations (defined in `data/repository/`).
  *
- * Currently empty — populated in Phase 1.4 onward as each repository is
- * introduced. Kept as an abstract class so `@Binds` methods can be added
- * without converting this file later.
+ * Additional bindings are added as repository implementations are built
+ * in later phases.
  */
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class RepositoryModule
+abstract class RepositoryModule {
+
+    @Binds
+    abstract fun bindUserRepository(impl: UserRepositoryImpl): UserRepository
+
+    @Binds
+    abstract fun bindActivityLogRepository(impl: ActivityLogRepositoryImpl): ActivityLogRepository
+}

@@ -40,39 +40,39 @@
 - [x] Seed default admin user on first launch (username: admin, password: admin123 — document that admin should change password after first login)
 
 ### 1.3 Dependency Injection
-- [ ] Create `AppModule.kt` (provides Room database, DAOs)
-- [ ] Create `RepositoryModule.kt` (binds repository interfaces to implementations)
-- [ ] Create `YkfjApp.kt` application class with `@HiltAndroidApp`
+- [x] Create `AppModule.kt` (provides Room database, DAOs)
+- [x] Create `RepositoryModule.kt` (binds repository interfaces to implementations)
+- [x] Create `YkfjApp.kt` application class with `@HiltAndroidApp`
 
 ### 1.4 Domain Layer Setup
-- [ ] Create domain models (`User`, `Product`, `MetalRate`, `Category`, `Customer`, `Supplier`, etc.)
-- [ ] Create repository interfaces (`UserRepository`, `ProductRepository`, `SupplierRepository`, etc.) — return `Flow<List<T>>` for observe queries
-- [ ] Create `ActivityLogRepository` interface and `LogActivityUseCase`
-- [ ] Create `PendingSyncManager.kt` interface/logic for offline change queueing (called by Repositories)
-- [ ] Create mappers between entities and domain models
+- [x] Create domain models (`User`, `Product`, `MetalRate`, `Category`, `Customer`, `Supplier`, etc.)
+- [x] Create repository interfaces (`UserRepository`, `ProductRepository`, `SupplierRepository`, etc.) — return `Flow<List<T>>` for observe queries
+- [x] Create `ActivityLogRepository` interface and `LogActivityUseCase`
+- [x] Create `PendingSyncManager.kt` interface/logic for offline change queueing (called by Repositories)
+- [x] Create mappers between entities and domain models
 
 ### 1.5 Theme, Navigation & Utilities
-- [ ] Create Material 3 theme (`Theme.kt`, `Color.kt`, `Type.kt`) — gold/warm color palette
-- [ ] Create `Screen` sealed class with all routes (Inventory, Sold Archive, Layaway, Paluwagan, Damaged, Metal Rates, Categories, Customers, Suppliers, Analytics, Settings)
-- [ ] Create `Sidebar.kt` composable (adaptive: permanent on tablet, modal on phone)
+- [x] Create Material 3 theme (`Theme.kt`, `Color.kt`, `Type.kt`) — gold/warm color palette
+- [x] Create `Screen` sealed class with all routes (Inventory, Sold Archive, Layaway, Paluwagan, Damaged, Metal Rates, Categories, Customers, Suppliers, Analytics, Settings)
+- [x] Create `Sidebar.kt` composable (adaptive: permanent on tablet, modal on phone)
   - Navigation items: Inventory, Sold Archive, Layaway, Paluwagan, Damaged, Metal Rates, Categories, Customers, Suppliers, Analytics, Settings
   - **Alert badges:** Red badge on Layaway (overdue count) and Paluwagan (due payments count)
   - Current user display + role badge at bottom
   - Logout button
-- [ ] Create `NavGraph.kt` with all screen routes (placeholder screens)
-- [ ] Create `MainActivity.kt` as single-activity Compose host
-- [ ] Create `CurrencyFormatter.kt` utility — formats all money values as ₱3,200.00 (Philippine Peso)
+- [x] Create `NavGraph.kt` with all screen routes (placeholder screens)
+- [x] Create `MainActivity.kt` as single-activity Compose host
+- [x] Create `CurrencyFormatter.kt` utility — formats all money values as ₱3,200.00 (Philippine Peso)
 
 ### 1.6 Authentication
-- [ ] Create `PasswordHasher.kt` utility (bcrypt)
-- [ ] Create `LoginUseCase.kt`
-- [ ] Create `LoginViewModel.kt` with `LoginUiState` sealed class (StateFlow pattern)
-- [ ] Create `LoginScreen.kt` (username + password + role display)
-- [ ] Create `SessionManager.kt` (holds current user in memory, survives config changes)
+- [x] Create `PasswordHasher.kt` utility (bcrypt)
+- [x] Create `LoginUseCase.kt`
+- [x] Create `LoginViewModel.kt` with `LoginUiState` sealed class (StateFlow pattern)
+- [x] Create `LoginScreen.kt` (username + password + role display)
+- [x] Create `SessionManager.kt` (holds current user in memory, survives config changes)
   - Logout function clears session → navigates to login
   - Auto-timeout after configurable idle period (default 30 min)
   - Timeout settings: 15 min / 30 min / 1 hour / Never
-- [ ] Implement role-based navigation gating
+- [x] Implement role-based navigation gating
 
 ### 1.7 Phase 1 Testing
 - [ ] Unit test: PasswordHasher
