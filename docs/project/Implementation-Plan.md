@@ -75,10 +75,10 @@
 - [x] Implement role-based navigation gating
 
 ### 1.7 Phase 1 Testing
-- [ ] Unit test: PasswordHasher
-- [ ] Unit test: LoginUseCase
-- [ ] Unit test: Room DAOs (in-memory DB) — verify indexes, FTS search, Flow emission
-- [ ] Manual test: app boots → login → sidebar visible → navigate between empty screens
+- [x] Unit test: PasswordHasher
+- [x] Unit test: LoginUseCase
+- [x] Unit test: Room DAOs (in-memory DB) — verify indexes, FTS search, Flow emission (instrumented)
+- [x] Manual test: app boots → login → sidebar visible → navigate between empty screens
 
 **Phase 1 Deliverable:** App boots in emulator, admin logs in, sees sidebar navigation with empty placeholder screens.
 
@@ -87,19 +87,19 @@
 ## Phase 2 — Core Inventory (Week 3-4)
 
 ### 2.1 Metal Rates
-- [ ] Create `MetalRateRepository` implementation
-- [ ] Create `AddMetalRateUseCase`, `UpdateMetalRateUseCase`, `DeleteMetalRateUseCase`, `GetMetalRatesUseCase`
-- [ ] Note: when a metal rate price changes, all weighted products using that rate auto-update (selling price is calculated dynamically: weight × rate, never stored for weighted items)
-- [ ] Create `MetalRatesViewModel.kt` with `MetalRatesUiState`
-- [ ] Create `MetalRatesScreen.kt` — list with add/edit/delete
-- [ ] Create `MetalRateFormDialog.kt` — modal for add/edit
+- [x] Create `MetalRateRepository` implementation
+- [x] Create `AddMetalRateUseCase`, `UpdateMetalRateUseCase`, `DeleteMetalRateUseCase`, `GetMetalRatesUseCase`
+- [x] Note: when a metal rate price changes, all weighted products using that rate auto-update (selling price is calculated dynamically: weight × rate, never stored for weighted items)
+- [x] Create `MetalRatesViewModel.kt` with `MetalRatesUiState`
+- [x] Create `MetalRatesScreen.kt` — list with add/edit/delete
+- [x] Create `MetalRateFormDialog.kt` — modal for add/edit
 
 ### 2.2 Categories
-- [ ] Create `CategoryRepository` implementation
-- [ ] Create `AddCategoryUseCase`, `UpdateCategoryUseCase`, `DeleteCategoryUseCase`, `GetCategoriesUseCase`
-- [ ] Create `CategoriesViewModel.kt` with `CategoriesUiState`
-- [ ] Create `CategoriesScreen.kt` — list with add/edit/delete
-- [ ] Create `CategoryFormDialog.kt` — modal for add/edit
+- [x] Create `CategoryRepository` implementation
+- [x] Create `AddCategoryUseCase`, `UpdateCategoryUseCase`, `DeleteCategoryUseCase`, `GetCategoriesUseCase`
+- [x] Create `CategoriesViewModel.kt` with `CategoriesUiState`
+- [x] Create `CategoriesScreen.kt` — list with add/edit/delete
+- [x] Create `CategoryFormDialog.kt` — modal for add/edit
 
 ### 2.3 Suppliers
 - [ ] Create `SupplierRepository` implementation

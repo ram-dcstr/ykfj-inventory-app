@@ -53,19 +53,24 @@ sealed class Screen(
         allowedRoles.isEmpty() || role in allowedRoles
 
     companion object {
-        val allScreens: List<Screen> = listOf(
-            Inventory,
-            SoldArchive,
-            Layaway,
-            Paluwagan,
-            Damaged,
-            MetalRates,
-            Categories,
-            Customers,
-            Suppliers,
-            Analytics,
-            Settings,
-        )
+        // `by lazy` is required: the companion initializes before nested
+        // `data object` members, so an eager `listOf(...)` would capture
+        // nulls and crash at first access with NPE on Screen.getRoute().
+        val allScreens: List<Screen> by lazy {
+            listOf(
+                Inventory,
+                SoldArchive,
+                Layaway,
+                Paluwagan,
+                Damaged,
+                MetalRates,
+                Categories,
+                Customers,
+                Suppliers,
+                Analytics,
+                Settings,
+            )
+        }
 
         fun sidebarItemsFor(role: UserRole): List<Screen> =
             allScreens.filter { it.isVisibleTo(role) }

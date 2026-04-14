@@ -1,8 +1,12 @@
 package com.ykfj.inventory.di
 
 import com.ykfj.inventory.data.repository.ActivityLogRepositoryImpl
+import com.ykfj.inventory.data.repository.CategoryRepositoryImpl
+import com.ykfj.inventory.data.repository.MetalRateRepositoryImpl
 import com.ykfj.inventory.data.repository.UserRepositoryImpl
 import com.ykfj.inventory.domain.repository.ActivityLogRepository
+import com.ykfj.inventory.domain.repository.CategoryRepository
+import com.ykfj.inventory.domain.repository.MetalRateRepository
 import com.ykfj.inventory.domain.repository.UserRepository
 import dagger.Binds
 import dagger.Module
@@ -25,4 +29,10 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindActivityLogRepository(impl: ActivityLogRepositoryImpl): ActivityLogRepository
+
+    @Binds
+    abstract fun bindMetalRateRepository(impl: MetalRateRepositoryImpl): MetalRateRepository
+
+    @Binds
+    abstract fun bindCategoryRepository(impl: CategoryRepositoryImpl): CategoryRepository
 }

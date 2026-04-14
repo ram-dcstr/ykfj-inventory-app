@@ -10,6 +10,8 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.ykfj.inventory.ui.categories.CategoriesScreen
+import com.ykfj.inventory.ui.metalrates.MetalRatesScreen
 
 @Composable
 fun NavGraph(
@@ -23,7 +25,11 @@ fun NavGraph(
     ) {
         Screen.allScreens.forEach { screen ->
             composable(screen.route) {
-                PlaceholderScreen(title = screen.label)
+                when (screen) {
+                    Screen.MetalRates -> MetalRatesScreen()
+                    Screen.Categories -> CategoriesScreen()
+                    else -> PlaceholderScreen(title = screen.label)
+                }
             }
         }
     }

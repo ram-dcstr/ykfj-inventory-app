@@ -16,4 +16,6 @@ interface CategoryRepository {
      * this category — see the deletion guard in `Inventory-Rules.md`.
      */
     suspend fun delete(id: String)
+
+    suspend fun countActiveProducts(categoryId: String): Int
 }

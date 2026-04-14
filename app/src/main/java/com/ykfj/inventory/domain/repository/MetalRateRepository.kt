@@ -16,4 +16,7 @@ interface MetalRateRepository {
      * this rate — see the deletion guard in `Inventory-Rules.md`.
      */
     suspend fun delete(id: String)
+
+    /** Number of non-deleted products referencing [rateId] — used by delete guard. */
+    suspend fun countActiveProducts(rateId: String): Int
 }
