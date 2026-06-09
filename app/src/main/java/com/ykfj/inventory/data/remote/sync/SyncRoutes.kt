@@ -77,10 +77,22 @@ fun Route.syncRoutes(db: YkfjDatabase, deviceId: String) {
             // Users — full upsert: insert new users, update existing (incl. password_hash).
             // Both devices are owner-controlled; syncing the bcrypt hash lets phone-created
             // accounts log in on the tablet without a separate provisioning step.
+            //
+            // Blank password_hash = "preserve existing". This protects against stale
+            // clients (built before the field existed) that would otherwise overwrite a
+            // valid hash with "". For a brand-new user with no existing row, we can't
+            // create them without a password, so skip the insert entirely.
             for (dto in payload.users) {
                 val existing = db.userDao().getById(dto.user_id)
-                if (existing == null) runCatching { db.userDao().insert(dto.toEntity()) }
-                else if (dto.updated_at > existing.updated_at) db.userDao().update(dto.toEntity())
+                val incoming = if (dto.password_hash.isBlank() && existing != null) {
+                    dto.copy(password_hash = existing.password_hash)
+                } else dto
+                if (existing == null) {
+                    if (incoming.password_hash.isBlank()) continue
+                    runCatching { db.userDao().insert(incoming.toEntity()) }
+                } else if (incoming.updated_at > existing.updated_at) {
+                    db.userDao().update(incoming.toEntity())
+                }
             }
 
             // Customers

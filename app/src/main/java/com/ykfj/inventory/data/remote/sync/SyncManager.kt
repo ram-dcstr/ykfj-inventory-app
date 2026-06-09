@@ -273,10 +273,21 @@ class SyncManager @Inject constructor(
         // Users: full upsert (insert new + update existing, password_hash included).
         // Both devices are owner-controlled; syncing the bcrypt hash lets phone-
         // created accounts log in on the tablet without separate provisioning.
+        //
+        // Blank password_hash from a stale client = "preserve existing". For a
+        // brand-new user with no existing row, skip — we can't create a passwordless
+        // account.
         changes.users.forEach { dto ->
             val existing = db.userDao().getById(dto.user_id)
-            if (existing == null) runCatching { db.userDao().insert(dto.toEntity()) }
-            else db.userDao().update(dto.toEntity())
+            val incoming = if (dto.password_hash.isBlank() && existing != null) {
+                dto.copy(password_hash = existing.password_hash)
+            } else dto
+            if (existing == null) {
+                if (incoming.password_hash.isBlank()) return@forEach
+                runCatching { db.userDao().insert(incoming.toEntity()) }
+            } else {
+                db.userDao().update(incoming.toEntity())
+            }
         }
 
         changes.gold_purchase_records.forEach { dto ->

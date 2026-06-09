@@ -17,12 +17,18 @@ import kotlinx.serialization.Serializable
 // The bcrypt hash is included so a user created on the phone can fully sync
 // (login working on either device after a push/pull cycle). Both devices are
 // owner-controlled and equally trusted; the hash itself is non-reversible.
+//
+// `password_hash` is defaulted to "" so payloads serialized by older builds
+// (before the field existed) still decode. The receiving side treats a blank
+// hash as "preserve existing" — see SyncRoutes /push users handler and
+// SyncManager.mergeChanges. Without that defence a stale client could wipe
+// a user's password on push.
 
 @Serializable
 data class UserSyncDto(
     val user_id: String,
     val username: String,
-    val password_hash: String,
+    val password_hash: String = "",
     val name: String,
     val role: String,
     val is_active: Boolean,
