@@ -115,15 +115,33 @@ interface SoldRecordDao {
 
     /**
      * Daily Cash (Phase 11): sum of `sold_price * quantity` for a given payment
-     * method on a given calendar day. Excludes deleted and archived rows.
-     * Returns 0.0 when no rows match — never null.
+     * method on a given calendar day, **netted against any linked trade-in gold
+     * purchase**. Excludes deleted and archived rows.
+     *
+     * Trade-in semantics: when a sale is paired with a gold purchase via
+     * `gold_purchase_records.linked_sold_record_id`, the customer paid the
+     * gross sale price only partially through this payment method — the rest
+     * was paid in scrap. So the actual cash/GCash/etc. that came in via this
+     * method is `(sold_price * quantity) − linked.total_paid`. Even swaps net
+     * to 0, customer-paid-difference cases net to just the difference, and
+     * shop-pays-out cases produce a negative contribution.
+     *
+     * Non-trade-in rows have no matching gold purchase → LEFT JOIN produces
+     * NULL → COALESCE → 0 → row contributes its full gross. Returns 0.0 when
+     * no rows match.
      */
     @Query(
         """
-        SELECT COALESCE(SUM(sold_price * quantity), 0.0) FROM sold_records
-        WHERE is_deleted = 0 AND is_archived = 0
-          AND payment_method = :paymentMethod
-          AND sold_date BETWEEN :startMillis AND :endMillis
+        SELECT COALESCE(SUM(
+            (s.sold_price * s.quantity) - COALESCE(gp.total_paid, 0)
+        ), 0.0)
+        FROM sold_records s
+        LEFT JOIN gold_purchase_records gp
+            ON gp.linked_sold_record_id = s.sold_id
+            AND gp.is_deleted = 0
+        WHERE s.is_deleted = 0 AND s.is_archived = 0
+          AND s.payment_method = :paymentMethod
+          AND s.sold_date BETWEEN :startMillis AND :endMillis
         """,
     )
     fun observeSumByPaymentMethodForDay(

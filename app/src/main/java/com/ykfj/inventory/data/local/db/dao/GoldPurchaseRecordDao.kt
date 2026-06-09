@@ -58,13 +58,20 @@ interface GoldPurchaseRecordDao {
     suspend fun getChangedSince(since: Long): List<GoldPurchaseRecordEntity>
 
     /**
-     * Daily Cash (Phase 11): total cash paid out for gold purchases on a given
-     * day (cash leaving the drawer). Returns 0.0 when no rows match.
+     * Daily Cash (Phase 11): total cash paid out for **straight gold purchases**
+     * on a given day. Trade-in gold purchases (rows with `linked_sold_record_id`
+     * set) are intentionally excluded — they're a barter against a sale, not a
+     * cash outflow. The trade-in's economic impact is already netted into the
+     * linked sale's payment-method bucket by
+     * [SoldRecordDao.observeSumByPaymentMethodForDay].
+     *
+     * Returns 0.0 when no rows match.
      */
     @Query(
         """
         SELECT COALESCE(SUM(total_paid), 0.0) FROM gold_purchase_records
         WHERE is_deleted = 0
+          AND linked_sold_record_id IS NULL
           AND paid_at BETWEEN :startMillis AND :endMillis
         """,
     )
