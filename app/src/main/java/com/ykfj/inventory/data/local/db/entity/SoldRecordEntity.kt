@@ -1,9 +1,11 @@
 package com.ykfj.inventory.data.local.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.ykfj.inventory.data.local.db.enums.DiscountType
+import com.ykfj.inventory.data.local.db.enums.PaymentMethod
 
 /**
  * A record of one sale transaction. Prices are **snapshotted** at sale time
@@ -39,6 +41,8 @@ data class SoldRecordEntity(
     val discount_type: DiscountType = DiscountType.NONE,
     val sold_date: Long,
     val notes: String? = null,
+    @ColumnInfo(defaultValue = "CASH")
+    val payment_method: PaymentMethod = PaymentMethod.CASH,
     val is_archived: Boolean = false,
     val created_at: Long,
     val updated_at: Long,

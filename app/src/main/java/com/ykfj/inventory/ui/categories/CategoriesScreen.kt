@@ -140,6 +140,7 @@ private fun Body(
             items(items = state.categories, key = { it.id }) { category ->
                 CategoryRow(
                     category = category,
+                    itemCount = state.categoryCounts[category.id] ?: 0,
                     onEdit = { onEdit(category) },
                     onDelete = { onDelete(category) },
                 )
@@ -151,6 +152,7 @@ private fun Body(
 @Composable
 private fun CategoryRow(
     category: Category,
+    itemCount: Int,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -166,6 +168,11 @@ private fun CategoryRow(
                     text = category.name,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = if (itemCount == 1) "1 item" else "$itemCount items",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             IconButton(onClick = onEdit) {

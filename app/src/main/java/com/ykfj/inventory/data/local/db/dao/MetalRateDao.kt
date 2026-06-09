@@ -11,6 +11,9 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface MetalRateDao {
 
+    @Query("SELECT COUNT(*) FROM metal_rates WHERE is_deleted = 0")
+    suspend fun count(): Int
+
     @Query("SELECT * FROM metal_rates WHERE is_deleted = 0 ORDER BY name COLLATE NOCASE ASC")
     fun observeAll(): Flow<List<MetalRateEntity>>
 

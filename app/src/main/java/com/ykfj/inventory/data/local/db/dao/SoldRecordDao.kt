@@ -56,10 +56,39 @@ interface SoldRecordDao {
         ORDER BY sold_date DESC
         """,
     )
+    fun observeForProduct(productId: String): Flow<List<SoldRecordEntity>>
+
+    @Query(
+        """
+        SELECT * FROM sold_records
+        WHERE is_deleted = 0 AND product_id = :productId
+        ORDER BY sold_date DESC
+        LIMIT 1
+        """,
+    )
+    suspend fun getMostRecentForProduct(productId: String): SoldRecordEntity?
+
+    @Query(
+        """
+        SELECT * FROM sold_records
+        WHERE is_deleted = 0 AND product_id = :productId
+        ORDER BY sold_date DESC
+        """,
+    )
     suspend fun getByProduct(productId: String): List<SoldRecordEntity>
 
     @Query("SELECT * FROM sold_records WHERE sold_id = :soldId LIMIT 1")
     suspend fun getById(soldId: String): SoldRecordEntity?
+
+    /** Finds the auto-generated SoldRecord created by completing a layaway (notes carry the marker). */
+    @Query(
+        """
+        SELECT * FROM sold_records
+        WHERE is_deleted = 0 AND notes = :notesMarker
+        LIMIT 1
+        """,
+    )
+    suspend fun findByNotes(notesMarker: String): SoldRecordEntity?
 
     @Query(
         """
@@ -83,4 +112,22 @@ interface SoldRecordDao {
 
     @Query("SELECT * FROM sold_records WHERE updated_at > :since")
     suspend fun getChangedSince(since: Long): List<SoldRecordEntity>
+
+    @Query(
+        """
+        SELECT * FROM sold_records
+        WHERE is_deleted = 0 AND is_archived = 1
+          AND sold_date BETWEEN :startMillis AND :endMillis
+        ORDER BY sold_date ASC
+        """,
+    )
+    suspend fun getArchivedInRange(startMillis: Long, endMillis: Long): List<SoldRecordEntity>
+
+    @Query(
+        """
+        DELETE FROM sold_records
+        WHERE is_archived = 1 AND sold_date BETWEEN :startMillis AND :endMillis
+        """,
+    )
+    suspend fun hardDeleteArchivedInRange(startMillis: Long, endMillis: Long): Int
 }

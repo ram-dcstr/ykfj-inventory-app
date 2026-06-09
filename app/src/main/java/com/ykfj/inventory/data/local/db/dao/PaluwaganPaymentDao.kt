@@ -55,6 +55,15 @@ interface PaluwaganPaymentDao {
     @Query("SELECT * FROM paluwagan_payments WHERE payment_id = :paymentId LIMIT 1")
     suspend fun getById(paymentId: String): PaluwaganPaymentEntity?
 
+    @Query(
+        """
+        SELECT * FROM paluwagan_payments
+        WHERE slot_id = :slotId AND round_number = :roundNumber AND is_deleted = 0
+        LIMIT 1
+        """,
+    )
+    suspend fun getForSlotAndRound(slotId: String, roundNumber: Int): PaluwaganPaymentEntity?
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(payment: PaluwaganPaymentEntity)
 
@@ -65,15 +74,37 @@ interface PaluwaganPaymentDao {
         """
         UPDATE paluwagan_payments
         SET status = :status, payment_date = :paymentDate,
-            amount_paid = :amountPaid, updated_at = :now
+            amount_paid = :amountPaid, payment_channel = :paymentChannel,
+            notes = :notes, updated_at = :now
         WHERE payment_id = :paymentId
         """,
     )
     suspend fun updateStatus(
         paymentId: String,
         status: PaluwaganPaymentStatus,
-        paymentDate: Long?,
+        paymentDate: Long,
         amountPaid: Double,
+        paymentChannel: String?,
+        notes: String?,
+        now: Long,
+    )
+
+    /** Full edit — also updates notes; used by admin to correct a recorded payment. */
+    @Query(
+        """
+        UPDATE paluwagan_payments
+        SET status = :status, payment_date = :paymentDate, amount_paid = :amountPaid,
+            payment_channel = :paymentChannel, notes = :notes, updated_at = :now
+        WHERE payment_id = :paymentId
+        """,
+    )
+    suspend fun updatePaymentFull(
+        paymentId: String,
+        status: PaluwaganPaymentStatus,
+        paymentDate: Long,
+        amountPaid: Double,
+        paymentChannel: String?,
+        notes: String?,
         now: Long,
     )
 
@@ -84,6 +115,9 @@ interface PaluwaganPaymentDao {
         """,
     )
     suspend fun softDelete(paymentId: String, now: Long)
+
+    @Query("DELETE FROM paluwagan_payments WHERE group_id = :groupId")
+    suspend fun hardDeleteByGroup(groupId: String)
 
     @Query("SELECT * FROM paluwagan_payments WHERE updated_at > :since")
     suspend fun getChangedSince(since: Long): List<PaluwaganPaymentEntity>

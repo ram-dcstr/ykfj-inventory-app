@@ -14,11 +14,16 @@ interface LayawayRepository {
 
     fun observeActive(): Flow<List<LayawayRecord>>
 
+    fun observeCompleted(): Flow<List<LayawayRecord>>
+
     fun observeForCustomer(customerId: String): Flow<List<LayawayRecord>>
 
     fun observeTransactions(layawayId: String): Flow<List<LayawayTransaction>>
 
     suspend fun getById(id: String): LayawayRecord?
+
+    /** Returns the single ACTIVE layaway for a product, or null if none. */
+    suspend fun getActiveForProduct(productId: String): LayawayRecord?
 
     suspend fun insert(record: LayawayRecord)
 
@@ -33,6 +38,9 @@ interface LayawayRepository {
 
     /** Marks COMPLETED and stamps `completion_date`. */
     suspend fun markCompleted(id: String, completionDate: Long)
+
+    /** Inverse of [markCompleted] — flips status back to ACTIVE and clears completion_date. Admin-only revert. */
+    suspend fun revertCompletion(id: String)
 
     /**
      * Marks CANCELLED, stamps `completion_date`, and sets

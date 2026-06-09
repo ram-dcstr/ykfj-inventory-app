@@ -11,7 +11,13 @@ enum class IdleTimeout(val label: String, val millis: Long) {
     FIFTEEN_MIN("15 min", 15 * 60 * 1_000L),
     THIRTY_MIN("30 min", 30 * 60 * 1_000L),
     ONE_HOUR("1 hour", 60 * 60 * 1_000L),
-    NEVER("Never", Long.MAX_VALUE),
+    NEVER("Never", Long.MAX_VALUE);
+
+    companion object {
+        /** Lenient `valueOf` for round-tripping the persisted enum name. */
+        fun fromName(name: String?): IdleTimeout =
+            entries.firstOrNull { it.name == name } ?: THIRTY_MIN
+    }
 }
 
 @Singleton
@@ -20,8 +26,9 @@ class SessionManager @Inject constructor() {
     private val _currentUser = MutableStateFlow<User?>(null)
     val currentUser: StateFlow<User?> = _currentUser.asStateFlow()
 
-    private var _idleTimeout: IdleTimeout = IdleTimeout.THIRTY_MIN
-    val idleTimeout: IdleTimeout get() = _idleTimeout
+    private val _idleTimeout = MutableStateFlow(IdleTimeout.THIRTY_MIN)
+    val idleTimeoutFlow: StateFlow<IdleTimeout> = _idleTimeout.asStateFlow()
+    val idleTimeout: IdleTimeout get() = _idleTimeout.value
 
     private var lastActivityTimestamp: Long = 0L
 
@@ -38,7 +45,7 @@ class SessionManager @Inject constructor() {
     }
 
     fun setIdleTimeout(timeout: IdleTimeout) {
-        _idleTimeout = timeout
+        _idleTimeout.value = timeout
     }
 
     /** Call on every user interaction to reset the idle timer. */
@@ -48,8 +55,8 @@ class SessionManager @Inject constructor() {
 
     /** Returns `true` if the session has been idle longer than the configured timeout. */
     fun isSessionExpired(): Boolean {
-        if (_idleTimeout == IdleTimeout.NEVER) return false
+        if (_idleTimeout.value == IdleTimeout.NEVER) return false
         if (lastActivityTimestamp == 0L) return true
-        return System.currentTimeMillis() - lastActivityTimestamp > _idleTimeout.millis
+        return System.currentTimeMillis() - lastActivityTimestamp > _idleTimeout.value.millis
     }
 }

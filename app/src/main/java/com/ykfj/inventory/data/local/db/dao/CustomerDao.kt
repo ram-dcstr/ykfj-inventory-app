@@ -39,7 +39,7 @@ interface CustomerDao {
     @Query(
         """
         UPDATE customers
-        SET credit_score = credit_score + :delta, updated_at = :now
+        SET credit_score = MAX(MIN(credit_score + :delta, 100), 0), updated_at = :now
         WHERE customer_id = :customerId
         """,
     )

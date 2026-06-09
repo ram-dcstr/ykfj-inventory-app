@@ -30,6 +30,8 @@ data class PaluwaganPaymentEntity(
     val payment_date: Long? = null,
     val status: PaluwaganPaymentStatus = PaluwaganPaymentStatus.UNPAID,
     val notes: String? = null,
+    /** Stored as PaymentMethod.name. Null for records created before this field was added. */
+    val payment_channel: String? = null,
     val created_at: Long,
     val updated_at: Long,
     val is_deleted: Boolean = false,

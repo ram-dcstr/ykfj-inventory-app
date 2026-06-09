@@ -1,14 +1,19 @@
 package com.ykfj.inventory.data.local.db
 
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.ykfj.inventory.data.local.db.converters.Converters
+import com.ykfj.inventory.data.local.db.dao.AnalyticsDao
 import com.ykfj.inventory.data.local.db.dao.ActivityLogDao
 import com.ykfj.inventory.data.local.db.dao.AppSettingsDao
+import com.ykfj.inventory.data.local.db.dao.CashMovementDao
 import com.ykfj.inventory.data.local.db.dao.CategoryDao
 import com.ykfj.inventory.data.local.db.dao.CustomerDao
 import com.ykfj.inventory.data.local.db.dao.DamagedRecordDao
+import com.ykfj.inventory.data.local.db.dao.GoldPurchaseItemDao
+import com.ykfj.inventory.data.local.db.dao.GoldPurchaseRecordDao
 import com.ykfj.inventory.data.local.db.dao.LayawayRecordDao
 import com.ykfj.inventory.data.local.db.dao.LayawayTransactionDao
 import com.ykfj.inventory.data.local.db.dao.MetalRateDao
@@ -23,9 +28,12 @@ import com.ykfj.inventory.data.local.db.dao.SupplierDao
 import com.ykfj.inventory.data.local.db.dao.UserDao
 import com.ykfj.inventory.data.local.db.entity.ActivityLogEntity
 import com.ykfj.inventory.data.local.db.entity.AppSettingsEntity
+import com.ykfj.inventory.data.local.db.entity.CashMovementEntity
 import com.ykfj.inventory.data.local.db.entity.CategoryEntity
 import com.ykfj.inventory.data.local.db.entity.CustomerEntity
 import com.ykfj.inventory.data.local.db.entity.DamagedRecordEntity
+import com.ykfj.inventory.data.local.db.entity.GoldPurchaseItemEntity
+import com.ykfj.inventory.data.local.db.entity.GoldPurchaseRecordEntity
 import com.ykfj.inventory.data.local.db.entity.LayawayRecordEntity
 import com.ykfj.inventory.data.local.db.entity.LayawayTransactionEntity
 import com.ykfj.inventory.data.local.db.entity.MetalRateEntity
@@ -68,10 +76,19 @@ import com.ykfj.inventory.data.local.db.entity.UserEntity
         ActivityLogEntity::class,
         AppSettingsEntity::class,
         PendingSyncEntity::class,
+        GoldPurchaseRecordEntity::class,
+        GoldPurchaseItemEntity::class,
+        CashMovementEntity::class,
     ],
-    version = 1,
+    version = 8,
     exportSchema = true,
-    autoMigrations = [],
+    autoMigrations = [
+        AutoMigration(from = 2, to = 3),
+        AutoMigration(from = 4, to = 5),
+        AutoMigration(from = 5, to = 6),
+        AutoMigration(from = 6, to = 7),
+        AutoMigration(from = 7, to = 8),
+    ],
 )
 @TypeConverters(Converters::class)
 abstract class YkfjDatabase : RoomDatabase() {
@@ -93,6 +110,10 @@ abstract class YkfjDatabase : RoomDatabase() {
     abstract fun activityLogDao(): ActivityLogDao
     abstract fun appSettingsDao(): AppSettingsDao
     abstract fun pendingSyncDao(): PendingSyncDao
+    abstract fun analyticsDao(): AnalyticsDao
+    abstract fun goldPurchaseRecordDao(): GoldPurchaseRecordDao
+    abstract fun goldPurchaseItemDao(): GoldPurchaseItemDao
+    abstract fun cashMovementDao(): CashMovementDao
 
     companion object {
         const val DATABASE_NAME = "ykfj.db"

@@ -12,4 +12,6 @@ interface SupplierRepository {
     suspend fun upsert(supplier: Supplier)
 
     suspend fun delete(id: String)
+
+    suspend fun countActiveProducts(supplierId: String): Int
 }

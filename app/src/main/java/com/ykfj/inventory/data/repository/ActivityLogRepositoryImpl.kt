@@ -4,6 +4,7 @@ import com.ykfj.inventory.data.local.db.dao.ActivityLogDao
 import com.ykfj.inventory.data.local.db.enums.ActivityAction
 import com.ykfj.inventory.data.mapper.toDomain
 import com.ykfj.inventory.data.mapper.toEntity
+import com.ykfj.inventory.data.remote.sync.SyncEnqueuer
 import com.ykfj.inventory.domain.model.ActivityLog
 import com.ykfj.inventory.domain.repository.ActivityLogRepository
 import kotlinx.coroutines.flow.Flow
@@ -12,6 +13,7 @@ import javax.inject.Inject
 
 class ActivityLogRepositoryImpl @Inject constructor(
     private val activityLogDao: ActivityLogDao,
+    private val syncEnqueuer: SyncEnqueuer,
 ) : ActivityLogRepository {
 
     override fun observe(
@@ -25,7 +27,9 @@ class ActivityLogRepositoryImpl @Inject constructor(
             .map { list -> list.map { it.toDomain() } }
 
     override suspend fun insert(entry: ActivityLog) {
-        activityLogDao.insert(entry.toEntity())
+        val entity = entry.toEntity()
+        activityLogDao.insert(entity)
+        syncEnqueuer.enqueueActivityLog(entity)
     }
 
     override suspend fun purgeOlderThan(olderThanEpochMillis: Long) {

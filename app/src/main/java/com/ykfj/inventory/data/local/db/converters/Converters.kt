@@ -4,7 +4,6 @@ import androidx.room.TypeConverter
 import com.ykfj.inventory.data.local.db.enums.ActivityAction
 import com.ykfj.inventory.data.local.db.enums.DiscountType
 import com.ykfj.inventory.data.local.db.enums.LayawayStatus
-import com.ykfj.inventory.data.local.db.enums.PaluwaganFrequency
 import com.ykfj.inventory.data.local.db.enums.PaluwaganGroupStatus
 import com.ykfj.inventory.data.local.db.enums.PaluwaganPaymentStatus
 import com.ykfj.inventory.data.local.db.enums.PricingType
@@ -48,13 +47,6 @@ class Converters {
 
     @TypeConverter
     fun stringToLayawayStatus(value: String): LayawayStatus = LayawayStatus.valueOf(value)
-
-    @TypeConverter
-    fun paluwaganFrequencyToString(value: PaluwaganFrequency): String = value.name
-
-    @TypeConverter
-    fun stringToPaluwaganFrequency(value: String): PaluwaganFrequency =
-        PaluwaganFrequency.valueOf(value)
 
     @TypeConverter
     fun paluwaganGroupStatusToString(value: PaluwaganGroupStatus): String = value.name

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.ykfj.inventory.data.local.db.enums.UserRole
@@ -26,7 +27,7 @@ sealed class Screen(
     data object SoldArchive : Screen("sold_archive", "Sold Archive", Icons.Default.Storefront)
     data object Layaway : Screen("layaway", "Layaway", Icons.Default.Handshake)
     data object Paluwagan : Screen("paluwagan", "Paluwagan", Icons.Default.Groups)
-    data object Damaged : Screen("damaged", "Damaged", Icons.Default.ReportProblem)
+    data object Damaged : Screen("damaged", "Damaged / Scraps", Icons.Default.ReportProblem)
     data object MetalRates : Screen(
         "metal_rates", "Metal Rates", Icons.Default.CurrencyExchange,
         allowedRoles = setOf(UserRole.ADMIN, UserRole.MANAGER),
@@ -36,6 +37,7 @@ sealed class Screen(
         allowedRoles = setOf(UserRole.ADMIN, UserRole.MANAGER),
     )
     data object Customers : Screen("customers", "Customers", Icons.Default.People)
+    data object GoldPurchases : Screen("gold_purchases", "Gold Purchases", Icons.Default.ShoppingCart)
     data object Suppliers : Screen(
         "suppliers", "Suppliers", Icons.Default.LocalShipping,
         allowedRoles = setOf(UserRole.ADMIN, UserRole.MANAGER),
@@ -66,6 +68,7 @@ sealed class Screen(
                 MetalRates,
                 Categories,
                 Customers,
+                GoldPurchases,
                 Suppliers,
                 Analytics,
                 Settings,

@@ -1,6 +1,7 @@
 package com.ykfj.inventory.domain.model
 
 import com.ykfj.inventory.data.local.db.enums.PaluwaganPaymentStatus
+import com.ykfj.inventory.data.local.db.enums.PaymentMethod
 
 /**
  * Per-slot, per-round paluwagan payment row. The tuple
@@ -15,6 +16,7 @@ data class PaluwaganPayment(
     val paymentDate: Long?,
     val status: PaluwaganPaymentStatus,
     val notes: String?,
+    val paymentMethod: PaymentMethod?,
     val createdAt: Long,
     val updatedAt: Long,
 )

@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.Flow
  */
 interface ProductImageRepository {
 
+    /** Maps productId → fileName for all non-deleted images — used by the inventory list for thumbnails. */
+    fun observeThumbMap(): Flow<Map<String, String>>
+
     fun observeForProduct(productId: String): Flow<ProductImage?>
 
     suspend fun getForProduct(productId: String): ProductImage?

@@ -1,6 +1,7 @@
 package com.ykfj.inventory
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -31,8 +32,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
+import com.ykfj.inventory.data.remote.sync.SyncManager
+import com.ykfj.inventory.data.remote.sync.SyncServerManager
+import com.ykfj.inventory.data.repository.DeviceRoleManager
+import com.ykfj.inventory.domain.sync.DeviceRole
 import com.ykfj.inventory.ui.auth.LoginScreen
 import com.ykfj.inventory.ui.auth.SessionManager
 import com.ykfj.inventory.ui.navigation.NavGraph
@@ -50,6 +56,15 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var sessionManager: SessionManager
+
+    @Inject
+    lateinit var syncManager: SyncManager
+
+    @Inject
+    lateinit var syncServerManager: SyncServerManager
+
+    @Inject
+    lateinit var deviceRoleManager: DeviceRoleManager
 
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -79,6 +94,9 @@ class MainActivity : ComponentActivity() {
                     AppShell(
                         isExpandedScreen = isExpandedScreen,
                         sessionManager = sessionManager,
+                        syncManager = syncManager,
+                        syncServerManager = syncServerManager,
+                        deviceRoleManager = deviceRoleManager,
                     )
                 }
             }
@@ -98,9 +116,17 @@ class MainActivity : ComponentActivity() {
 private fun AppShell(
     isExpandedScreen: Boolean,
     sessionManager: SessionManager,
+    syncManager: SyncManager,
+    syncServerManager: SyncServerManager,
+    deviceRoleManager: DeviceRoleManager,
 ) {
     val navController = rememberNavController()
     val currentUser by sessionManager.currentUser.collectAsStateWithLifecycle()
+    val syncStatus by syncManager.status.collectAsStateWithLifecycle()
+    val deviceRole by deviceRoleManager.deviceRole.collectAsStateWithLifecycle(initialValue = DeviceRole.TABLET)
+    val isServerRunning by syncServerManager.isRunning.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val syncScope = rememberCoroutineScope()
     var selectedScreen by rememberSaveable { mutableStateOf(Screen.Inventory.route) }
 
     val activeScreen = Screen.allScreens.firstOrNull { it.route == selectedScreen }
@@ -117,6 +143,25 @@ private fun AppShell(
 
     val onLogout: () -> Unit = { sessionManager.logout() }
 
+    val onSyncTap: () -> Unit = {
+        when (deviceRole) {
+            DeviceRole.PHONE -> {
+                if (!syncStatus.isSyncing) {
+                    Toast.makeText(context, "Syncing now…", Toast.LENGTH_SHORT).show()
+                    syncScope.launch { syncManager.sync() }
+                }
+            }
+            DeviceRole.TABLET -> {
+                val msg = if (isServerRunning) {
+                    "Sync server running on port ${SyncServerManager.SERVER_PORT}"
+                } else {
+                    "Sync server stopped. Open Settings to restart."
+                }
+                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     // TODO: Wire real badge counts from DAOs in Phase 2+
     val layawayOverdueCount = 0
     val paluwaganDueCount = 0
@@ -130,6 +175,10 @@ private fun AppShell(
                 paluwaganDueCount = paluwaganDueCount,
                 onScreenSelected = onScreenSelected,
                 onLogout = onLogout,
+                syncStatus = syncStatus,
+                deviceRole = deviceRole,
+                isServerRunning = isServerRunning,
+                onSyncTap = onSyncTap,
             )
             Scaffold { padding ->
                 NavGraph(
@@ -156,6 +205,10 @@ private fun AppShell(
                             scope.launch { drawerState.close() }
                         },
                         onLogout = onLogout,
+                        syncStatus = syncStatus,
+                        deviceRole = deviceRole,
+                        isServerRunning = isServerRunning,
+                        onSyncTap = onSyncTap,
                     )
                 }
             },

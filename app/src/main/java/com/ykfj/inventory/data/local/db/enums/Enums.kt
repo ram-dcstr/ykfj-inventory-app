@@ -12,11 +12,23 @@ enum class DiscountType { NONE, FIXED, PERCENTAGE }
 
 enum class LayawayStatus { ACTIVE, COMPLETED, CANCELLED }
 
-enum class PaluwaganFrequency { DAILY, WEEKLY, BI_WEEKLY, MONTHLY }
+enum class PaymentMethod(val label: String) {
+    CASH("Cash"),
+    GCASH("GCash"),
+    ONLINE_BANKING("Online Banking"),
+    OTHER("Other"),
+}
 
 enum class PaluwaganGroupStatus { ACTIVE, COMPLETED }
 
-enum class PaluwaganPaymentStatus { PAID, UNPAID, LATE }
+enum class PaluwaganPaymentStatus { PAID, UNPAID, LATE, PREPAID }
+
+enum class CashMovementType {
+    CHANGE_FLOAT,
+    PURCHASE_FLOAT,
+    EXPENSE,
+    ADJUSTMENT,
+}
 
 enum class ActivityAction {
     LOGIN,
@@ -34,4 +46,8 @@ enum class ActivityAction {
     BACKUP,
     RESTORE,
     SETTINGS_CHANGE,
+    GOLD_PURCHASED,
+    GOLD_PURCHASE_REVERTED,
+    GOLD_SOLD_TO_SUPPLIER,
+    GOLD_SOLD_TO_SUPPLIER_REVERTED,
 }

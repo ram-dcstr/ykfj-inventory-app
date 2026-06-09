@@ -1,6 +1,7 @@
 package com.ykfj.inventory.domain.model
 
 import com.ykfj.inventory.data.local.db.enums.DiscountType
+import com.ykfj.inventory.data.local.db.enums.PaymentMethod
 
 /**
  * Historical record of one sale. Prices are snapshotted at sale time so
@@ -21,6 +22,7 @@ data class SoldRecord(
     val discountType: DiscountType,
     val soldDate: Long,
     val notes: String?,
+    val paymentMethod: PaymentMethod = PaymentMethod.CASH,
     val isArchived: Boolean,
     val createdAt: Long,
     val updatedAt: Long,

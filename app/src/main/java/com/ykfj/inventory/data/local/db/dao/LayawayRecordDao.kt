@@ -24,6 +24,15 @@ interface LayawayRecordDao {
     @Query(
         """
         SELECT * FROM layaway_records
+        WHERE is_deleted = 0 AND is_archived = 0 AND status = 'COMPLETED'
+        ORDER BY completion_date DESC, created_at DESC
+        """,
+    )
+    fun observeCompleted(): Flow<List<LayawayRecordEntity>>
+
+    @Query(
+        """
+        SELECT * FROM layaway_records
         WHERE is_deleted = 0 AND is_archived = 0 AND customer_id = :customerId AND status = 'ACTIVE'
         ORDER BY created_at DESC
         """,
@@ -63,6 +72,15 @@ interface LayawayRecordDao {
 
     @Query("SELECT * FROM layaway_records WHERE layaway_id = :layawayId LIMIT 1")
     suspend fun getById(layawayId: String): LayawayRecordEntity?
+
+    @Query(
+        """
+        SELECT * FROM layaway_records
+        WHERE product_id = :productId AND status = 'ACTIVE' AND is_deleted = 0
+        LIMIT 1
+        """,
+    )
+    suspend fun getActiveForProduct(productId: String): LayawayRecordEntity?
 
     @Query("SELECT * FROM layaway_records WHERE layaway_id = :layawayId")
     fun observeById(layawayId: String): Flow<LayawayRecordEntity?>
@@ -124,4 +142,22 @@ interface LayawayRecordDao {
 
     @Query("SELECT * FROM layaway_records WHERE updated_at > :since")
     suspend fun getChangedSince(since: Long): List<LayawayRecordEntity>
+
+    @Query(
+        """
+        SELECT * FROM layaway_records
+        WHERE is_deleted = 0 AND is_archived = 1
+          AND created_at BETWEEN :startMillis AND :endMillis
+        ORDER BY created_at ASC
+        """,
+    )
+    suspend fun getArchivedInRange(startMillis: Long, endMillis: Long): List<LayawayRecordEntity>
+
+    @Query(
+        """
+        DELETE FROM layaway_records
+        WHERE is_archived = 1 AND created_at BETWEEN :startMillis AND :endMillis
+        """,
+    )
+    suspend fun hardDeleteArchivedInRange(startMillis: Long, endMillis: Long): Int
 }

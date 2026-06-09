@@ -3,6 +3,12 @@ package com.ykfj.inventory.di
 import android.content.Context
 import androidx.room.Room
 import com.ykfj.inventory.data.local.db.YkfjDatabase
+import com.ykfj.inventory.data.local.db.migration.MIGRATION_1_2
+import com.ykfj.inventory.data.local.db.migration.MIGRATION_3_4
+import com.ykfj.inventory.data.local.db.dao.AnalyticsDao
+import com.ykfj.inventory.data.local.db.dao.CashMovementDao
+import com.ykfj.inventory.data.local.db.dao.GoldPurchaseItemDao
+import com.ykfj.inventory.data.local.db.dao.GoldPurchaseRecordDao
 import com.ykfj.inventory.data.local.db.dao.ActivityLogDao
 import com.ykfj.inventory.data.local.db.dao.AppSettingsDao
 import com.ykfj.inventory.data.local.db.dao.CategoryDao
@@ -45,7 +51,7 @@ object AppModule {
         context,
         YkfjDatabase::class.java,
         YkfjDatabase.DATABASE_NAME,
-    ).build()
+    ).addMigrations(MIGRATION_1_2, MIGRATION_3_4).build()
 
     @Provides
     fun provideUserDao(db: YkfjDatabase): UserDao = db.userDao()
@@ -99,4 +105,18 @@ object AppModule {
 
     @Provides
     fun providePendingSyncDao(db: YkfjDatabase): PendingSyncDao = db.pendingSyncDao()
+
+    @Provides
+    fun provideAnalyticsDao(db: YkfjDatabase): AnalyticsDao = db.analyticsDao()
+
+    @Provides
+    fun provideGoldPurchaseRecordDao(db: YkfjDatabase): GoldPurchaseRecordDao =
+        db.goldPurchaseRecordDao()
+
+    @Provides
+    fun provideGoldPurchaseItemDao(db: YkfjDatabase): GoldPurchaseItemDao =
+        db.goldPurchaseItemDao()
+
+    @Provides
+    fun provideCashMovementDao(db: YkfjDatabase): CashMovementDao = db.cashMovementDao()
 }

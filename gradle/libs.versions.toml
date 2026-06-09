@@ -41,7 +41,7 @@ bcrypt = "0.10.2"
 jwt = "4.4.0"
 
 # WorkManager (nightly backups)
-workManager = "2.10.0"
+workManager = "2.9.1"
 hiltWork = "1.2.0"
 
 # Coroutines

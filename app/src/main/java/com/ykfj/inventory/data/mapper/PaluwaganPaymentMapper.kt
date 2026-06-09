@@ -1,6 +1,7 @@
 package com.ykfj.inventory.data.mapper
 
 import com.ykfj.inventory.data.local.db.entity.PaluwaganPaymentEntity
+import com.ykfj.inventory.data.local.db.enums.PaymentMethod
 import com.ykfj.inventory.domain.model.PaluwaganPayment
 
 internal fun PaluwaganPaymentEntity.toDomain(): PaluwaganPayment = PaluwaganPayment(
@@ -12,6 +13,7 @@ internal fun PaluwaganPaymentEntity.toDomain(): PaluwaganPayment = PaluwaganPaym
     paymentDate = payment_date,
     status = status,
     notes = notes,
+    paymentMethod = payment_channel?.let { runCatching { PaymentMethod.valueOf(it) }.getOrNull() },
     createdAt = created_at,
     updatedAt = updated_at,
 )
@@ -25,6 +27,7 @@ internal fun PaluwaganPayment.toEntity(): PaluwaganPaymentEntity = PaluwaganPaym
     payment_date = paymentDate,
     status = status,
     notes = notes,
+    payment_channel = paymentMethod?.name,
     created_at = createdAt,
     updated_at = updatedAt,
     is_deleted = false,

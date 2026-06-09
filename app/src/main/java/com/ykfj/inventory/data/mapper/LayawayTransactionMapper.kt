@@ -9,6 +9,7 @@ internal fun LayawayTransactionEntity.toDomain(): LayawayTransaction = LayawayTr
     amountPaid = amount_paid,
     paymentDate = payment_date,
     notes = notes,
+    paymentMethod = payment_method,
     createdAt = created_at,
     updatedAt = updated_at,
 )
@@ -19,6 +20,7 @@ internal fun LayawayTransaction.toEntity(): LayawayTransactionEntity = LayawayTr
     amount_paid = amountPaid,
     payment_date = paymentDate,
     notes = notes,
+    payment_method = paymentMethod,
     created_at = createdAt,
     updated_at = updatedAt,
     is_deleted = false,

@@ -3,6 +3,7 @@ package com.ykfj.inventory.ui.categories
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ykfj.inventory.domain.model.Category
+import com.ykfj.inventory.domain.repository.ProductRepository
 import com.ykfj.inventory.domain.usecase.category.AddCategoryUseCase
 import com.ykfj.inventory.domain.usecase.category.DeleteCategoryUseCase
 import com.ykfj.inventory.domain.usecase.category.GetCategoriesUseCase
@@ -19,6 +20,7 @@ import javax.inject.Inject
 
 data class CategoriesUiState(
     val categories: List<Category> = emptyList(),
+    val categoryCounts: Map<String, Int> = emptyMap(),
     val isLoading: Boolean = true,
     val editing: Category? = null,
     val isFormOpen: Boolean = false,
@@ -32,6 +34,7 @@ class CategoriesViewModel @Inject constructor(
     private val updateCategory: UpdateCategoryUseCase,
     private val deleteCategory: DeleteCategoryUseCase,
     private val sessionManager: SessionManager,
+    productRepository: ProductRepository,
 ) : ViewModel() {
 
     private val _formState = MutableStateFlow(FormState())
@@ -40,11 +43,13 @@ class CategoriesViewModel @Inject constructor(
     val uiState: StateFlow<CategoriesUiState> =
         combine(
             getCategories(),
+            productRepository.observeCountsPerCategory(),
             _formState,
             _error,
-        ) { categories, form, err ->
+        ) { categories, counts, form, err ->
             CategoriesUiState(
                 categories = categories,
+                categoryCounts = counts,
                 isLoading = false,
                 editing = form.editing,
                 isFormOpen = form.open,

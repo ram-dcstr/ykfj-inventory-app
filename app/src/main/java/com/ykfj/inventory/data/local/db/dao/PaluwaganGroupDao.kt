@@ -1,5 +1,6 @@
 package com.ykfj.inventory.data.local.db.dao
 
+import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -38,10 +39,10 @@ interface PaluwaganGroupDao {
     )
     fun observeArchived(): Flow<List<PaluwaganGroupEntity>>
 
-    @Query("SELECT * FROM paluwagan_groups WHERE group_id = :groupId LIMIT 1")
+    @Query("SELECT * FROM paluwagan_groups WHERE group_id = :groupId AND is_deleted = 0 LIMIT 1")
     suspend fun getById(groupId: String): PaluwaganGroupEntity?
 
-    @Query("SELECT * FROM paluwagan_groups WHERE group_id = :groupId")
+    @Query("SELECT * FROM paluwagan_groups WHERE group_id = :groupId AND is_deleted = 0")
     fun observeById(groupId: String): Flow<PaluwaganGroupEntity?>
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
@@ -74,6 +75,46 @@ interface PaluwaganGroupDao {
     )
     suspend fun softDelete(groupId: String, now: Long)
 
+    @Query(
+        """
+        SELECT * FROM paluwagan_groups
+        WHERE is_deleted = 0 AND status = 'COMPLETED'
+        ORDER BY updated_at DESC
+        """,
+    )
+    fun completedGroupsPaged(): PagingSource<Int, PaluwaganGroupEntity>
+
+    /** Hard-deletes completed groups older than [cutoff] (epoch millis). */
+    @Query(
+        """
+        DELETE FROM paluwagan_groups
+        WHERE status = 'COMPLETED' AND updated_at < :cutoff AND is_deleted = 0
+        """,
+    )
+    suspend fun purgeCompletedOlderThan(cutoff: Long)
+
+    /** Admin hard-delete of a single completed group. */
+    @Query("DELETE FROM paluwagan_groups WHERE group_id = :groupId")
+    suspend fun hardDelete(groupId: String)
+
     @Query("SELECT * FROM paluwagan_groups WHERE updated_at > :since")
     suspend fun getChangedSince(since: Long): List<PaluwaganGroupEntity>
+
+    @Query(
+        """
+        SELECT * FROM paluwagan_groups
+        WHERE is_deleted = 0 AND is_archived = 1
+          AND start_date BETWEEN :startMillis AND :endMillis
+        ORDER BY start_date ASC
+        """,
+    )
+    suspend fun getArchivedInRange(startMillis: Long, endMillis: Long): List<PaluwaganGroupEntity>
+
+    @Query(
+        """
+        DELETE FROM paluwagan_groups
+        WHERE is_archived = 1 AND start_date BETWEEN :startMillis AND :endMillis
+        """,
+    )
+    suspend fun hardDeleteArchivedInRange(startMillis: Long, endMillis: Long): Int
 }

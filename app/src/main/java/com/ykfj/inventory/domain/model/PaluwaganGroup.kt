@@ -1,6 +1,5 @@
 package com.ykfj.inventory.domain.model
 
-import com.ykfj.inventory.data.local.db.enums.PaluwaganFrequency
 import com.ykfj.inventory.data.local.db.enums.PaluwaganGroupStatus
 
 /**
@@ -14,7 +13,8 @@ data class PaluwaganGroup(
     val id: String,
     val name: String,
     val contributionAmount: Double,
-    val frequency: PaluwaganFrequency,
+    /** Payment interval in days (e.g. 5, 7, 15, 30). */
+    val frequencyDays: Int,
     val totalSlots: Int,
     val currentRound: Int,
     val status: PaluwaganGroupStatus,

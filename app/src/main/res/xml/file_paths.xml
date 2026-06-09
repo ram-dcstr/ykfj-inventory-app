@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Temp camera capture files: context.filesDir/images/camera/ -->
+    <files-path name="camera_capture" path="images/camera/" />
+</paths>

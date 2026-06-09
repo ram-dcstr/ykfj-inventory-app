@@ -4,9 +4,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current State
 
-**Phase 2.2 complete** — Categories module shipped, mirroring the Phase 2.1 pattern. `CategoryRepositoryImpl` (injects `ProductDao` for delete guard via `countByCategory`), four use cases (`Get`/`Add`/`Update`/`DeleteCategoryUseCase` — delete returns sealed `Result` with `Blocked(activeProductCount)`), `CategoriesViewModel` + `CategoriesUiState`, `CategoriesScreen` (LazyColumn of `Card` rows + FAB, delete confirm dialog), `CategoryFormDialog` (name only). Wired into Hilt (`RepositoryModule.bindCategoryRepository`) and `NavGraph` (`Screen.Categories -> CategoriesScreen()`). Phase 2.1 Metal Rates module also in place with the same structure. Next up: Phase 2.3 (Suppliers).
+**Phases 1–6 + 9 shipped as features.** Most plan checkboxes for those phases are ticked; the unchecked items in those phases are the per-phase test bullets (only `LoginUseCaseTest` + `PasswordHasherTest` unit tests and three DAO instrumented tests exist so far) and one deliberately deferred item: a per-screen "Archived" tab in Sold/Layaway/Paluwagan/Damaged ([Implementation-Plan.md:425](docs/project/Implementation-Plan.md:425)). Schema is at **v8** in [YkfjDatabase.kt](app/src/main/java/com/ykfj/inventory/data/local/db/YkfjDatabase.kt) with auto-migrations 2→3, 4→5, 5→6, 6→7, 7→8 plus manual `MIGRATION_1_2` and `MIGRATION_3_4`.
+
+Phase highlights:
+- **Phase 2** — Full inventory CRUD: `AddItemModal` / `AddItemForm` / `AddItemWidgets`, `ProductIdGenerator`, `ImageCompressor` + `ImageStorageManager`, `InventoryScreen` + `ProductCard` + `ProductDetailScreen` (read-only variant via `product_detail_readonly/{id}`), status-change dialogs (`SoldDialog`, `LayawayDialog`, `DamagedDialog`, `RevertDialog`).
+- **Phase 3** — Sold archive, full layaway flow (`LayawayScreen`, `LayawayDetailScreen`, `CustomerLayawayDetailScreen`, payments + split + cancel + complete + revert + update), full paluwagan flow (`PaluwaganScreen` + `PaluwaganDetailScreen` with create/swap/advance/complete/reorder + multi-slot payments), `DamagedScreen` + a **melt sub-flow** (`MeltDamagedProductUseCase`, `GetMeltedRecordsUseCase`, `RevertMeltUseCase`) that isn't in the original plan but ships in-tree.
+- **Phase 4** — `AnalyticsScreen` (daily/monthly), `AnalyticsDao`, `ExportSalesUseCase` (CSV via `CsvWriter`), `ExportDailySalesPdfUseCase` (PDF with iText password protection), `GetInventorySummaryUseCase`, `GetGoldTradingSummaryUseCase`.
+- **Phase 5** — Ktor embedded server on tablet ([SyncServer.kt](app/src/main/java/com/ykfj/inventory/data/remote/sync/SyncServer.kt), `SyncForegroundService` / `PhoneSyncForegroundService` started from `YkfjApp.onCreate` based on `DeviceRoleManager.getRole()`), NSD discovery + `ConnectionResolver`, JWT auth (`JwtConfig`, `AuthRoutes`), CRUD/sync/image routes, `SyncClient` + `SyncManager` + `SyncEnqueuer`, `PendingSyncManagerImpl` for offline queueing.
+- **Phase 6** — `UserManagementScreen` + dialogs, `ArchiveManagerScreen`, `BackupScreen` backed by `BackupManager` + `BackupRestoreHelper` + `BackupWorker.scheduleDaily()`, `ActivityLogScreen` + `CleanupActivityLogsUseCase` (90-day prune on launch), `SettingsScreen.SessionAppInfoSection` (idle-timeout chooser, admin-only daily-export PDF password, read-only `AppInfoBlock`), `PermissionChecker` util.
+- **Phase 9 — Gold Purchases Core (complete)** — New module not in the original 1–8 phases. `GoldPurchasesScreen` + `AddGoldPurchaseModal` + `GoldPurchaseDetailScreen`, `GoldPurchaseRepositoryImpl` (atomic record-plus-items insert via `withTransaction`), six use cases (`Add`/`Get`/`GetDetail`/`Revert`/`MarkSoldToSupplier`/`UnmarkSoldToSupplier`), `cash_movements` table created (data only — Phase 11 will use it), `PaymentMethodPicker` composable added to sell/layaway dialogs (`SoldRecordEntity.payment_method` + `LayawayTransactionEntity.payment_method` columns, default `CASH`).
+
+**Next up:** Phase 10 (Trade-in / Swap — link a `GoldPurchaseRecord` to a `SoldRecord` atomically inside the sell dialog) and Phase 11 (Daily Cash screen — uses the already-migrated `cash_movements` table). Then Phase 7 QA + Phase 8 launch. See [docs/project/Implementation-Plan.md](docs/project/Implementation-Plan.md) lines 776–872 for the Phase 10/11 task lists.
 
 **Always begin a session by reading [docs/project/Implementation-Plan.md](docs/project/Implementation-Plan.md)** to find the next unchecked task. The plan has checkbox-tracked phases; work top-down and mark items as they land.
+
+⚠️ **Heads-up on git state:** as of this writing, every feature past `fd6325b` ("core domain use cases…") lives in the working tree but is uncommitted. Run `git status` at the start of a session to see what's already on disk before assuming a feature is missing.
 
 ## Project Overview
 
@@ -43,22 +55,37 @@ Reactive flow: `Room DAO (Flow) → Repository (Flow) → UseCase (Flow) → Vie
 ### Package layout (`com.ykfj.inventory`)
 
 ```
-di/            # Hilt modules
+di/                    # Hilt modules (AppModule, RepositoryModule)
 data/
-  local/db/    # Room database, entities, DAOs
-  local/backup/
-  remote/sync/ # Ktor server + NSD + sync logic
-  repository/  # Repository implementations
+  local/
+    AppSettingKeys.kt          # Centralised keys for app_settings table
+    backup/                    # BackupManager, BackupRestoreHelper, BackupWorker
+    db/                        # YkfjDatabase, entities, DAOs
+      converters/ enums/ entity/ dao/ migration/
+    image/                     # ImageStorageManager
+  mapper/                      # Entity ↔ domain mappers
+  remote/sync/                 # Ktor server, NSD, JWT, sync client, foreground services
+  repository/                  # Repository impls + DeviceRoleManager + PendingSyncManagerImpl
 domain/
-  model/       # Domain models
-  usecase/     # One class per business action
-  repository/  # Repository interfaces
+  model/                       # Domain models
+  repository/                  # Repository interfaces
+  sync/                        # DeviceRole, PendingSyncManager interface
+  usecase/                     # One class per business action, grouped by feature
+    activitylog/ analytics/ archive/ auth/ category/ customer/
+    damaged/ goldpurchase/ layaway/ metalrate/ paluwagan/
+    product/ sold/ supplier/ user/
 ui/
   theme/ components/ navigation/
-  auth/ inventory/ sold/ layaway/ paluwagan/ damaged/
+  auth/                        # LoginScreen + SessionManager (+ IdleTimeout)
+  inventory/                   # InventoryScreen, AddItemModal, ProductDetailScreen, status dialogs
+  sold/ layaway/ paluwagan/ damaged/
   metalrates/ categories/ customers/ suppliers/
-  analytics/ archive/ settings/
-util/          # CurrencyFormatter, ProductIdGenerator, PasswordHasher, DateUtils
+  goldpurchase/                # GoldPurchasesScreen, AddGoldPurchaseModal, detail screen
+  analytics/
+  settings/                    # SettingsScreen + sub-screens:
+    activity/ archive/ backup/ users/
+util/                          # CurrencyFormatter, ProductIdGenerator, PasswordHasher,
+                               # PermissionChecker, ImageCompressor, CsvWriter
 ```
 
 ## Coding Standards
@@ -117,6 +144,12 @@ Sidebar shows red alert badges on **Layaway** (overdue count) and **Paluwagan** 
 
 ### Images
 - **1 image per product.** Two versions generated at save time: full (max 1024px, ~200KB) and thumbnail (200×200, ~15KB). Lists load thumbnails; detail view loads full.
+
+### Payment methods & Gold Purchases (Phase 9)
+- Every sold record and layaway transaction carries a `payment_method` (`CASH` / `GCASH` / `ONLINE_BANKING` / `OTHER`, default `CASH`). Use the shared `PaymentMethodPicker` composable in [ui/components/](app/src/main/java/com/ykfj/inventory/ui/components/PaymentMethodPicker.kt) — don't reinvent.
+- **Gold Purchases** (the shop buying scrap/jewellery from customers) is a first-class module. A `GoldPurchaseRecord` has 1+ `GoldPurchaseItem` rows; per-item value is `weight × buy_rate_per_gram` unless overridden manually. All roles can record a purchase; only Admin can revert.
+- `GoldPurchaseRecord.linkedSoldRecordId` is reserved for **Phase 10 trade-ins** — leave null in Phase 9 flows. `RevertGoldPurchaseUseCase` returns `IsTradeIn` if the link is set, so trade-in reverts must go through the (not-yet-built) `RevertTradeInUseCase`.
+- `cash_movements` table exists (migrated in v5→v6) but is unused until Phase 11 (Daily Cash) ships.
 
 ## Build & Run
 

@@ -11,6 +11,9 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface ProductImageDao {
 
+    @Query("SELECT * FROM product_images WHERE is_deleted = 0")
+    fun observeAll(): Flow<List<ProductImageEntity>>
+
     @Query("SELECT * FROM product_images WHERE product_id = :productId AND is_deleted = 0 LIMIT 1")
     fun observeByProduct(productId: String): Flow<ProductImageEntity?>
 

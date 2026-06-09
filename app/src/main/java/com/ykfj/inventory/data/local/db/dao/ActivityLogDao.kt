@@ -73,4 +73,7 @@ interface ActivityLogDao {
         startMillis: Long,
         endMillis: Long,
     ): List<ActivityLogEntity>
+
+    @Query("SELECT * FROM activity_logs WHERE timestamp > :since ORDER BY timestamp ASC")
+    suspend fun getChangedSince(since: Long): List<ActivityLogEntity>
 }

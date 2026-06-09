@@ -3,7 +3,6 @@ package com.ykfj.inventory.data.local.db.entity
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import com.ykfj.inventory.data.local.db.enums.PaluwaganFrequency
 import com.ykfj.inventory.data.local.db.enums.PaluwaganGroupStatus
 
 /**
@@ -28,7 +27,8 @@ data class PaluwaganGroupEntity(
     @PrimaryKey val group_id: String,
     val name: String,
     val contribution_amount: Double,
-    val frequency: PaluwaganFrequency,
+    /** Payment interval in days — entered manually (e.g. 5, 7, 15, 30). */
+    val frequency_days: Int,
     val total_slots: Int,
     /** 1-based. 0 = not started. */
     val current_round: Int = 0,

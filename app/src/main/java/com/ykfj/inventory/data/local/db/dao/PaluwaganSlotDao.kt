@@ -45,8 +45,41 @@ interface PaluwaganSlotDao {
     )
     suspend fun updatePosition(slotId: String, position: Int, now: Long)
 
+    @Query(
+        """
+        UPDATE paluwagan_slots
+        SET original_customer_id = CASE
+                WHEN original_customer_id IS NULL THEN customer_id
+                ELSE original_customer_id END,
+            customer_id = :newCustomerId,
+            updated_at = :now
+        WHERE slot_id = :slotId
+        """,
+    )
+    suspend fun updateCustomer(slotId: String, newCustomerId: String, now: Long)
+
     @Query("UPDATE paluwagan_slots SET is_deleted = 1, updated_at = :now WHERE slot_id = :slotId")
     suspend fun softDelete(slotId: String, now: Long)
+
+    @Query(
+        """
+        SELECT * FROM paluwagan_slots
+        WHERE group_id = :groupId AND is_deleted = 0
+        ORDER BY position ASC
+        """,
+    )
+    suspend fun getSlotsForGroup(groupId: String): List<PaluwaganSlotEntity>
+
+    @Query(
+        """
+        UPDATE paluwagan_slots SET pot_collected_at = :date, updated_at = :now
+        WHERE slot_id = :slotId
+        """,
+    )
+    suspend fun updatePotCollectedAt(slotId: String, date: Long, now: Long)
+
+    @Query("DELETE FROM paluwagan_slots WHERE group_id = :groupId")
+    suspend fun hardDeleteByGroup(groupId: String)
 
     @Query("SELECT * FROM paluwagan_slots WHERE updated_at > :since")
     suspend fun getChangedSince(since: Long): List<PaluwaganSlotEntity>

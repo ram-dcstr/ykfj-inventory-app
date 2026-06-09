@@ -1,8 +1,10 @@
 package com.ykfj.inventory.data.local.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.ykfj.inventory.data.local.db.enums.PaymentMethod
 
 /**
  * One payment line on a layaway. Split payments across multiple layaways
@@ -26,6 +28,8 @@ data class LayawayTransactionEntity(
     val amount_paid: Double,
     val payment_date: Long,
     val notes: String? = null,
+    @ColumnInfo(defaultValue = "CASH")
+    val payment_method: PaymentMethod = PaymentMethod.CASH,
     val created_at: Long,
     val updated_at: Long,
     val is_deleted: Boolean = false,

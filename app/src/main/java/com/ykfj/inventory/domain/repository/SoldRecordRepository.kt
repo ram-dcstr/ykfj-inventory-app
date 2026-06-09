@@ -14,6 +14,12 @@ interface SoldRecordRepository {
 
     suspend fun getById(id: String): SoldRecord?
 
+    /** Most recent non-deleted sold record for a product — used by revert. */
+    suspend fun getMostRecentForProduct(productId: String): SoldRecord?
+
+    /** Finds the auto-created sold record from a layaway completion (the layaway-revert flow needs to clean it up). */
+    suspend fun findByLayawayCompletion(layawayId: String): SoldRecord?
+
     suspend fun insert(record: SoldRecord)
 
     suspend fun update(record: SoldRecord)
