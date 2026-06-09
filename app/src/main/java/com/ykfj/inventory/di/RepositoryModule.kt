@@ -1,6 +1,7 @@
 package com.ykfj.inventory.di
 
 import com.ykfj.inventory.data.repository.AppSettingsRepositoryImpl
+import com.ykfj.inventory.data.repository.CashMovementRepositoryImpl
 import com.ykfj.inventory.data.repository.GoldPurchaseRepositoryImpl
 import com.ykfj.inventory.data.repository.PaluwaganRepositoryImpl
 import com.ykfj.inventory.data.repository.PendingSyncManagerImpl
@@ -16,6 +17,7 @@ import com.ykfj.inventory.data.repository.SoldRecordRepositoryImpl
 import com.ykfj.inventory.data.repository.SupplierRepositoryImpl
 import com.ykfj.inventory.data.repository.UserRepositoryImpl
 import com.ykfj.inventory.domain.repository.AppSettingsRepository
+import com.ykfj.inventory.domain.repository.CashMovementRepository
 import com.ykfj.inventory.domain.repository.GoldPurchaseRepository
 import com.ykfj.inventory.domain.repository.PaluwaganRepository
 import com.ykfj.inventory.domain.sync.PendingSyncManager
@@ -90,4 +92,7 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindGoldPurchaseRepository(impl: GoldPurchaseRepositoryImpl): GoldPurchaseRepository
+
+    @Binds
+    abstract fun bindCashMovementRepository(impl: CashMovementRepositoryImpl): CashMovementRepository
 }

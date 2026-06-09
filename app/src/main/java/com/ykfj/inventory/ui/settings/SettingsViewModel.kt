@@ -52,6 +52,8 @@ data class SettingsUiState(
     // ── Session & App Info (Phase 6.6) ───────────────────────────────────────
     val idleTimeout: IdleTimeout = IdleTimeout.THIRTY_MIN,
     val dailyExportPassword: String = AppSettingKeys.DAILY_EXPORT_PASSWORD_FALLBACK,
+    /** Phase 11: default opening cash float per day. Admin/Manager edit; staff view-only. */
+    val defaultChangeFloat: Double = 0.0,
     /** Logged-in user's role — drives admin-only setting visibility. */
     val currentUserRole: UserRole? = null,
     val appVersion: String = BuildConfig.VERSION_NAME,
@@ -100,11 +102,14 @@ class SettingsViewModel @Inject constructor(
             val username = db.appSettingsDao().getValue(SyncManager.KEY_SYNC_USERNAME) ?: ""
             val exportPassword = db.appSettingsDao().getValue(AppSettingKeys.DAILY_EXPORT_PASSWORD)
                 ?: AppSettingKeys.DAILY_EXPORT_PASSWORD_FALLBACK
+            val changeFloat = db.appSettingsDao().getValue(AppSettingKeys.DEFAULT_CHANGE_FLOAT)
+                ?.toDoubleOrNull() ?: 0.0
             _uiState.update {
                 it.copy(
                     tabletIp = ip,
                     syncUsername = username,
                     dailyExportPassword = exportPassword,
+                    defaultChangeFloat = changeFloat,
                 )
             }
         }
@@ -280,6 +285,21 @@ class SettingsViewModel @Inject constructor(
                 AppSettingsEntity(key = AppSettingKeys.DAILY_EXPORT_PASSWORD, value = trimmed)
             )
             _uiState.update { it.copy(dailyExportPassword = trimmed) }
+        }
+    }
+
+    /**
+     * Phase 11: persists the default opening cash float. Used by DailyCashScreen
+     * to auto-create the CHANGE_FLOAT row when the shop opens a new day with no
+     * existing entry. Admin/Manager only — gated at the UI layer.
+     */
+    fun setDefaultChangeFloat(amount: Double) {
+        if (amount < 0) return
+        viewModelScope.launch {
+            db.appSettingsDao().upsert(
+                AppSettingsEntity(key = AppSettingKeys.DEFAULT_CHANGE_FLOAT, value = amount.toString())
+            )
+            _uiState.update { it.copy(defaultChangeFloat = amount) }
         }
     }
 }

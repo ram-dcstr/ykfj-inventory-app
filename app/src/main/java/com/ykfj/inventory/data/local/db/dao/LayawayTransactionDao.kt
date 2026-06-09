@@ -47,4 +47,38 @@ interface LayawayTransactionDao {
 
     @Query("SELECT * FROM layaway_transactions WHERE updated_at > :since")
     suspend fun getChangedSince(since: Long): List<LayawayTransactionEntity>
+
+    /**
+     * Daily Cash (Phase 11): sum of layaway payments matching a payment method
+     * on a given calendar day. Returns 0.0 when no rows match.
+     */
+    @Query(
+        """
+        SELECT COALESCE(SUM(amount_paid), 0.0) FROM layaway_transactions
+        WHERE is_deleted = 0
+          AND payment_method = :paymentMethod
+          AND payment_date BETWEEN :startMillis AND :endMillis
+        """,
+    )
+    fun observeSumByPaymentMethodForDay(
+        paymentMethod: String,
+        startMillis: Long,
+        endMillis: Long,
+    ): Flow<Double>
+
+    /** Daily Cash: layaway payments matching a payment method on a given day. */
+    @Query(
+        """
+        SELECT * FROM layaway_transactions
+        WHERE is_deleted = 0
+          AND payment_method = :paymentMethod
+          AND payment_date BETWEEN :startMillis AND :endMillis
+        ORDER BY payment_date DESC
+        """,
+    )
+    fun observeByPaymentMethodForDay(
+        paymentMethod: String,
+        startMillis: Long,
+        endMillis: Long,
+    ): Flow<List<LayawayTransactionEntity>>
 }

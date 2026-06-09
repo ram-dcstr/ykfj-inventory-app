@@ -112,6 +112,7 @@ fun SettingsScreen(
             uiState = uiState,
             onTimeoutSelected = viewModel::setIdleTimeout,
             onSaveExportPassword = viewModel::setDailyExportPassword,
+            onSaveChangeFloat = viewModel::setDefaultChangeFloat,
         )
 
         // Sync configuration is install-time noise — collapsed unless something needs attention.
@@ -529,9 +530,11 @@ private fun SessionAppInfoSection(
     uiState: SettingsUiState,
     onTimeoutSelected: (IdleTimeout) -> Unit,
     onSaveExportPassword: (String) -> Unit,
+    onSaveChangeFloat: (Double) -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     val isAdmin = uiState.currentUserRole == UserRole.ADMIN
+    val isAdminOrManager = isAdmin || uiState.currentUserRole == UserRole.MANAGER
 
     Column {
         Row(
@@ -570,6 +573,12 @@ private fun SessionAppInfoSection(
                     DailyExportPasswordField(
                         persisted = uiState.dailyExportPassword,
                         onSave = onSaveExportPassword,
+                    )
+                }
+                if (isAdminOrManager) {
+                    DefaultChangeFloatField(
+                        persisted = uiState.defaultChangeFloat,
+                        onSave = onSaveChangeFloat,
                     )
                 }
                 AppInfoBlock(
@@ -649,6 +658,49 @@ private fun DailyExportPasswordField(
             )
             Button(
                 onClick = { onSave(field) },
+                enabled = dirty,
+            ) { Text("Save") }
+        }
+    }
+}
+
+@Composable
+private fun DefaultChangeFloatField(
+    persisted: Double,
+    onSave: (Double) -> Unit,
+) {
+    var field by remember(persisted) {
+        mutableStateOf(if (persisted > 0) "%.2f".format(persisted) else "")
+    }
+    val parsed = field.toDoubleOrNull()
+    val dirty = parsed != null && parsed >= 0 && parsed != persisted
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = "Default change float",
+            style = MaterialTheme.typography.labelLarge,
+        )
+        Text(
+            text = "Opening cash auto-seeded into Daily Cash when the shop opens for a new day.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedTextField(
+                value = field,
+                onValueChange = { field = it.filter { c -> c.isDigit() || c == '.' } },
+                label = { Text("Amount (₱)") },
+                singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal,
+                ),
+                modifier = Modifier.weight(1f),
+            )
+            Button(
+                onClick = { parsed?.let(onSave) },
                 enabled = dirty,
             ) { Text("Save") }
         }

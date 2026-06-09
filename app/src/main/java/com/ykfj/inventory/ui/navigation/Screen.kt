@@ -1,6 +1,7 @@
 package com.ykfj.inventory.ui.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.CurrencyExchange
@@ -38,6 +39,7 @@ sealed class Screen(
     )
     data object Customers : Screen("customers", "Customers", Icons.Default.People)
     data object GoldPurchases : Screen("gold_purchases", "Gold Purchases", Icons.Default.ShoppingCart)
+    data object DailyCash : Screen("daily_cash", "Daily Cash", Icons.Default.AccountBalanceWallet)
     data object Suppliers : Screen(
         "suppliers", "Suppliers", Icons.Default.LocalShipping,
         allowedRoles = setOf(UserRole.ADMIN, UserRole.MANAGER),
@@ -70,6 +72,7 @@ sealed class Screen(
                 Customers,
                 GoldPurchases,
                 Suppliers,
+                DailyCash,
                 Analytics,
                 Settings,
             )

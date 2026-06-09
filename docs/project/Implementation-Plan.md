@@ -811,23 +811,20 @@
 
 ### 11.1 Settings — Change Float Default
 
-- [ ] `ui/settings/SettingsViewModel.kt` — add `defaultChangeFloat: Double`, `setDefaultChangeFloat(amount: Double)` (persists to `app_settings.default_change_float`)
-- [ ] `ui/settings/SettingsScreen.kt` `SessionAppInfoSection` — add "Default change float" field (numeric, Admin/Manager only)
+- [x] `ui/settings/SettingsViewModel.kt` — added `defaultChangeFloat: Double` to `SettingsUiState`, `setDefaultChangeFloat(amount: Double)` persists to `app_settings.default_change_float` via existing `AppSettingKeys.DEFAULT_CHANGE_FLOAT` constant.
+- [x] `ui/settings/SettingsScreen.kt` — new `DefaultChangeFloatField` composable in `SessionAppInfoSection`, gated to Admin/Manager via `isAdminOrManager`.
 
 ### 11.2 Domain & Data
 
-- [ ] Create `domain/model/CashMovement.kt` — mirrors entity; `type: CashMovementType`, `amount: Double`, `date: Long`, `notes: String?`, `recordedBy: String`, `recordedAt: Long`
-- [ ] Create `domain/repository/CashMovementRepository.kt`:
-  - `fun observeForDay(dayMillis: Long): Flow<List<CashMovement>>`
-  - `suspend fun getForTypeAndDay(type: CashMovementType, dayMillis: Long): CashMovement?`
-  - `suspend fun upsert(movement: CashMovement)`
-  - `suspend fun softDelete(id: String)`
-- [ ] Create `data/repository/CashMovementRepositoryImpl.kt`; bind in Hilt
-- [ ] Create `data/mapper/CashMovementMapper.kt`
+- [x] `domain/model/CashMovement.kt` — domain model mirrors the entity (signed `amount`, `date` = start-of-day millis, `recordedAt` = wall-clock).
+- [x] `domain/repository/CashMovementRepository.kt` — `observeForDay`, `getForTypeAndDay`, `upsert`, `softDelete`.
+- [x] `data/repository/CashMovementRepositoryImpl.kt` — wraps `CashMovementDao`, calls `SyncEnqueuer.enqueueCashMovement` on every mutation so daily cash propagates phone↔tablet (sync wiring already in place from earlier work). Bound in `RepositoryModule`.
+- [x] `data/mapper/CashMovementMapper.kt` — entity↔domain mappers.
+- [x] DAO aggregate queries added: `SoldRecordDao.observeSumByPaymentMethodForDay` + `observeByPaymentMethodForDay`, `LayawayTransactionDao.observeSumByPaymentMethodForDay` + `observeByPaymentMethodForDay`, `GoldPurchaseRecordDao.observeSumForDay`.
 
 ### 11.3 Daily Cash ViewModel & Screen
 
-- [ ] Create `ui/dailycash/DailyCashViewModel.kt`:
+- [x] Create `ui/dailycash/DailyCashViewModel.kt`:
   - `DailyCashUiState` — `selectedDay: Long`, `changeFloat: Double`, `purchaseFloat: Double`, `cashSales: Double`, `gcashSales: Double`, `onlineBankingSales: Double`, `otherSales: Double`, `cashLayawayPayments: Double`, `goldPurchasesTotal: Double`, `expenses: List<CashMovement>`, `adjustments: List<CashMovement>`, `cashBalance: Double`, `totalCollected: Double`, `isAdmin: Boolean`, `isAdminOrManager: Boolean`
   - `selectedDay` defaults to start-of-today; `changeDay(dayMillis)` allows browsing past days
   - Combines multiple `Flow`s: `CashMovementRepository.observeForDay`, `SoldRecordDao.observeSumByPaymentMethodForDay`, `LayawayTransactionDao.observeSumByPaymentMethodForDay`, `GoldPurchaseRecordDao.observeSumForDay`
@@ -837,7 +834,7 @@
   - `addAdjustment(amount, notes)` — Admin only
   - `cashBalance = changeFloat + purchaseFloat + cashSales + cashLayawayPayments − goldPurchasesTotal − expenses.sum() + adjustments.sum()`
   - `totalCollected = cashBalance + gcashSales + onlineBankingSales + otherSales`
-- [ ] Create `ui/dailycash/DailyCashScreen.kt`:
+- [x] Create `ui/dailycash/DailyCashScreen.kt`:
   - Date navigation at top (back/forward arrows + date label; defaults to today)
   - **Cash section** (Physical cash in store):
     - Change float row (editable by Admin/Manager — tap to edit)
@@ -855,9 +852,9 @@
 
 ### 11.4 Navigation & Sidebar
 
-- [ ] `ui/navigation/Screen.kt` — add `Screen.DailyCash` (route `"daily_cash"`, label `"Daily Cash"`, icon `Icons.Default.AccountBalanceWallet` or similar)
-- [ ] `ui/navigation/NavGraph.kt` — add `DailyCash` composable destination
-- [ ] `ui/navigation/Sidebar.kt` — add `DailyCash` after `Paluwagan` and before `Analytics` for all roles
+- [x] `ui/navigation/Screen.kt` — added `Screen.DailyCash` (route `"daily_cash"`, icon `AccountBalanceWallet`, all-roles visibility), inserted into `allScreens` between Suppliers and Analytics.
+- [x] `ui/navigation/NavGraph.kt` — added `Screen.DailyCash -> DailyCashScreen()` branch.
+- [x] `ui/navigation/Sidebar.kt` — no edit needed; sidebar items are derived from `Screen.allScreens` via `sidebarItemsFor(role)`.
 
 ### 11.5 Phase 11 Testing
 

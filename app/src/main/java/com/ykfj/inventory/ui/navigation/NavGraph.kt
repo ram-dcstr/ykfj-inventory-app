@@ -24,6 +24,7 @@ import com.ykfj.inventory.ui.paluwagan.PaluwaganDetailScreen
 import com.ykfj.inventory.ui.paluwagan.PaluwaganScreen
 import com.ykfj.inventory.ui.customers.CustomerDetailScreen
 import com.ykfj.inventory.ui.customers.CustomersScreen
+import com.ykfj.inventory.ui.dailycash.DailyCashScreen
 import com.ykfj.inventory.ui.inventory.AddItemModal
 import com.ykfj.inventory.ui.inventory.InventoryScreen
 import com.ykfj.inventory.ui.inventory.ProductDetailScreen
@@ -84,6 +85,7 @@ fun NavGraph(
                             navController.navigate("paluwagan_detail/$groupId")
                         },
                     )
+                    Screen.DailyCash -> DailyCashScreen()
                     Screen.Analytics -> AnalyticsScreen()
                     Screen.Settings -> SettingsScreen(
                         onNavigateToUserManagement = { navController.navigate("user_management") },

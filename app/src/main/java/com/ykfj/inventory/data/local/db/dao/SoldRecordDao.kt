@@ -113,6 +113,41 @@ interface SoldRecordDao {
     @Query("SELECT * FROM sold_records WHERE updated_at > :since")
     suspend fun getChangedSince(since: Long): List<SoldRecordEntity>
 
+    /**
+     * Daily Cash (Phase 11): sum of `sold_price * quantity` for a given payment
+     * method on a given calendar day. Excludes deleted and archived rows.
+     * Returns 0.0 when no rows match — never null.
+     */
+    @Query(
+        """
+        SELECT COALESCE(SUM(sold_price * quantity), 0.0) FROM sold_records
+        WHERE is_deleted = 0 AND is_archived = 0
+          AND payment_method = :paymentMethod
+          AND sold_date BETWEEN :startMillis AND :endMillis
+        """,
+    )
+    fun observeSumByPaymentMethodForDay(
+        paymentMethod: String,
+        startMillis: Long,
+        endMillis: Long,
+    ): Flow<Double>
+
+    /** Daily Cash: sales matching a payment method on a given day. Used to expand the row's detail list. */
+    @Query(
+        """
+        SELECT * FROM sold_records
+        WHERE is_deleted = 0 AND is_archived = 0
+          AND payment_method = :paymentMethod
+          AND sold_date BETWEEN :startMillis AND :endMillis
+        ORDER BY sold_date DESC
+        """,
+    )
+    fun observeByPaymentMethodForDay(
+        paymentMethod: String,
+        startMillis: Long,
+        endMillis: Long,
+    ): Flow<List<SoldRecordEntity>>
+
     @Query(
         """
         SELECT * FROM sold_records
