@@ -78,8 +78,11 @@ fun LayawayDetailScreen(
     LaunchedEffect(state.error) {
         state.error?.let { snackbarHost.showSnackbar(it); viewModel.clearError() }
     }
+    // state.success is now vestigial — VM emits through the global
+    // SnackbarController instead. Keeping the field nullable-clear here so
+    // a stale value left from a prior session doesn't ghost-trigger.
     LaunchedEffect(state.success) {
-        state.success?.let { snackbarHost.showSnackbar(it); viewModel.clearSuccess() }
+        if (state.success != null) viewModel.clearSuccess()
     }
 
     Scaffold(

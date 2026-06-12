@@ -69,15 +69,13 @@ fun BackupScreen(
         if (uri != null) pendingRestoreUri = uri
     }
 
+    // Success now routes through the global SnackbarController.
     LaunchedEffect(state.errorMessage, state.infoMessage) {
         state.errorMessage?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.consumeMessages()
         }
-        state.infoMessage?.let {
-            snackbarHostState.showSnackbar(it)
-            viewModel.consumeMessages()
-        }
+        if (state.infoMessage != null) viewModel.consumeMessages()
     }
 
     Scaffold(

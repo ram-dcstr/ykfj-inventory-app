@@ -88,15 +88,14 @@ fun ActivityLogScreen(
     var showUserMenu by remember { mutableStateOf(false) }
     var showActionMenu by remember { mutableStateOf(false) }
 
+    // Success now routes through the global SnackbarController. Local host
+    // still handles errors inline.
     LaunchedEffect(state.errorMessage, state.infoMessage) {
         state.errorMessage?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.consumeMessages()
         }
-        state.infoMessage?.let {
-            snackbarHostState.showSnackbar(it)
-            viewModel.consumeMessages()
-        }
+        if (state.infoMessage != null) viewModel.consumeMessages()
     }
 
     Scaffold(

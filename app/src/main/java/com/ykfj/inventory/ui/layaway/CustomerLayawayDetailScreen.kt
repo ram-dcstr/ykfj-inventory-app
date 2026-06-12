@@ -77,8 +77,10 @@ fun CustomerLayawayDetailScreen(
     LaunchedEffect(state.error) {
         state.error?.let { snackbarHost.showSnackbar(it); viewModel.clearError() }
     }
+    // state.success is now vestigial — VM emits through the global
+    // SnackbarController instead.
     LaunchedEffect(state.success) {
-        state.success?.let { snackbarHost.showSnackbar(it); viewModel.clearSuccess() }
+        if (state.success != null) viewModel.clearSuccess()
     }
 
     Scaffold(

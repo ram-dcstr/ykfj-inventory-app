@@ -65,11 +65,11 @@ fun SoldArchiveScreen(
     LaunchedEffect(state.error) {
         state.error?.let { snackbarHost.showSnackbar(it); viewModel.clearError() }
     }
+    // Export confirmation now flows through the global SnackbarController in
+    // the ViewModel. Just clear the local field on emission so the user can
+    // re-export the same day if they want.
     LaunchedEffect(state.exportedFilename) {
-        state.exportedFilename?.let {
-            snackbarHost.showSnackbar("Saved to Downloads: $it")
-            viewModel.clearExported()
-        }
+        if (state.exportedFilename != null) viewModel.clearExported()
     }
 
     Scaffold(snackbarHost = { SnackbarHost(snackbarHost) }) { padding ->
