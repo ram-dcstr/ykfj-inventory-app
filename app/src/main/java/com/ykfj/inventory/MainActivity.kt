@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -83,27 +84,40 @@ class MainActivity : ComponentActivity() {
 
                 val currentUser by sessionManager.currentUser.collectAsStateWithLifecycle()
 
-                // Idle timeout check
+                // Idle timeout check. Emits the flash BEFORE logout so the snackbar
+                // host (mounted at the root, see below) catches it while the user
+                // is still in the "logged-in" branch — by the time LoginScreen renders,
+                // the snackbar is already on screen.
                 LaunchedEffect(currentUser) {
                     while (currentUser != null && isActive) {
                         delay(60_000) // check every minute
                         if (sessionManager.isSessionExpired()) {
+                            snackbarController.showInfo("Logged out due to inactivity")
                             sessionManager.logout()
                         }
                     }
                 }
 
-                if (currentUser == null) {
-                    LoginScreen(onLoginSuccess = { /* state auto-updates via Flow */ })
-                } else {
-                    AppShell(
-                        isExpandedScreen = isExpandedScreen,
-                        sessionManager = sessionManager,
-                        syncManager = syncManager,
-                        syncServerManager = syncServerManager,
-                        deviceRoleManager = deviceRoleManager,
-                        snackbarController = snackbarController,
-                    )
+                // Root-level Scaffold so the snackbar host stays mounted across the
+                // LoginScreen ↔ AppShell transition. Without this, login welcome and
+                // idle-logout messages would be lost — the host would unmount before
+                // they reach the screen.
+                Scaffold(
+                    snackbarHost = { AppSnackbarHost(snackbarController) },
+                ) { padding ->
+                    Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                        if (currentUser == null) {
+                            LoginScreen(onLoginSuccess = { /* state auto-updates via Flow */ })
+                        } else {
+                            AppShell(
+                                isExpandedScreen = isExpandedScreen,
+                                sessionManager = sessionManager,
+                                syncManager = syncManager,
+                                syncServerManager = syncServerManager,
+                                deviceRoleManager = deviceRoleManager,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -125,7 +139,6 @@ private fun AppShell(
     syncManager: SyncManager,
     syncServerManager: SyncServerManager,
     deviceRoleManager: DeviceRoleManager,
-    snackbarController: SnackbarController,
 ) {
     val navController = rememberNavController()
     val currentUser by sessionManager.currentUser.collectAsStateWithLifecycle()
@@ -187,9 +200,7 @@ private fun AppShell(
                 isServerRunning = isServerRunning,
                 onSyncTap = onSyncTap,
             )
-            Scaffold(
-                snackbarHost = { AppSnackbarHost(snackbarController) },
-            ) { padding ->
+            Scaffold { padding ->
                 NavGraph(
                     navController = navController,
                     modifier = Modifier.padding(padding),
@@ -236,7 +247,6 @@ private fun AppShell(
                         },
                     )
                 },
-                snackbarHost = { AppSnackbarHost(snackbarController) },
             ) { padding ->
                 NavGraph(
                     navController = navController,

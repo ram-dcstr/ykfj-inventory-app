@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ykfj.inventory.domain.usecase.auth.LoginResult
 import com.ykfj.inventory.domain.usecase.auth.LoginUseCase
+import com.ykfj.inventory.ui.components.SnackbarController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +23,7 @@ sealed interface LoginUiState {
 class LoginViewModel @Inject constructor(
     private val loginUseCase: LoginUseCase,
     private val sessionManager: SessionManager,
+    private val snackbarController: SnackbarController,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
@@ -40,6 +42,7 @@ class LoginViewModel @Inject constructor(
                 is LoginResult.Success -> {
                     sessionManager.login(result.user)
                     _uiState.value = LoginUiState.Success
+                    snackbarController.showSuccess("Welcome, ${result.user.name}")
                 }
                 is LoginResult.InvalidCredentials -> {
                     _uiState.value = LoginUiState.Error("Invalid username or password")
