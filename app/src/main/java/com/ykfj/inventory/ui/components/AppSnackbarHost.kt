@@ -17,16 +17,16 @@ import com.ykfj.inventory.ui.theme.Gold80
  * the app and every `snackbarController.showSuccess(...)` call from any VM
  * will surface here.
  *
- * Colors are kind-aware so the user can tell at a glance whether something
- * succeeded vs failed:
- *  - SUCCESS → primary gold tone (matches the app's brand)
- *  - INFO    → default Material 3 inverse surface (neutral)
- *  - ERROR   → red Material 3 error container
+ * Every snackbar uses the same gold-on-dark styling regardless of kind. The
+ * [SnackbarKind] enum exists in the controller for future expansion (e.g.
+ * tinting error snackbars red when error paths migrate off the per-screen
+ * pattern), but today the message text alone conveys success vs info — errors
+ * are still handled by per-screen `SnackbarHost`s near the action that
+ * produced them.
  *
- * Snackbars are short by default (~3s). The host doesn't expose an action
- * affordance yet — the original plan called for an "Undo" button on reversible
- * operations, but every destructive action in this app currently routes through
- * its own confirm dialog first, so undo would be redundant.
+ * Snackbars are short by default (~3s). No action affordance: every
+ * destructive flow in this app already routes through its own confirm dialog,
+ * so an "Undo" button on the snackbar would be redundant.
  */
 @Composable
 fun AppSnackbarHost(controller: SnackbarController) {
@@ -46,11 +46,6 @@ fun AppSnackbarHost(controller: SnackbarController) {
     }
 
     SnackbarHost(hostState = hostState) { data ->
-        // We can't recover the original SnackbarKind from SnackbarData, so we
-        // peek at the controller's most recent event via the message string is
-        // brittle. Simpler: keep the visual style consistent (gold accent for
-        // every snackbar) and rely on the message text to convey success vs
-        // failure. Errors are rare in this app since most flows pre-validate.
         Snackbar(
             snackbarData = data,
             containerColor = Gold30,
