@@ -133,7 +133,10 @@ class AnalyticsViewModel @Inject constructor(
             when (val result = exportSales(ExportSalesUseCase.Params(start, end, userId))) {
                 is ExportSalesUseCase.Result.Success -> {
                     _exportState.update { ExportState(uri = result.uri) }
-                    snackbarController.showSuccess("Sales CSV exported · open from Downloads")
+                    // AnalyticsScreen's LaunchedEffect on exportedUri fires a share
+                    // intent right after this — don't say "open from Downloads"
+                    // because the user gets an "Open CSV with…" picker immediately.
+                    snackbarController.showSuccess("Sales CSV exported")
                 }
                 is ExportSalesUseCase.Result.Error ->
                     _exportState.update { ExportState(error = result.message) }
