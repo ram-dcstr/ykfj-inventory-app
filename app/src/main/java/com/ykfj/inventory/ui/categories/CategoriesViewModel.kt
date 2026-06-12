@@ -34,6 +34,7 @@ class CategoriesViewModel @Inject constructor(
     private val updateCategory: UpdateCategoryUseCase,
     private val deleteCategory: DeleteCategoryUseCase,
     private val sessionManager: SessionManager,
+    private val snackbarController: com.ykfj.inventory.ui.components.SnackbarController,
     productRepository: ProductRepository,
 ) : ViewModel() {
 
@@ -91,8 +92,10 @@ class CategoriesViewModel @Inject constructor(
         viewModelScope.launch {
             if (editing == null) {
                 addCategory(name = name, actorUserId = userId)
+                snackbarController.showSuccess("Category \"$name\" added")
             } else {
                 updateCategory(id = editing.id, name = name, actorUserId = userId)
+                snackbarController.showSuccess("Category \"$name\" updated")
             }
             closeForm()
         }
@@ -107,7 +110,8 @@ class CategoriesViewModel @Inject constructor(
                         if (r.activeProductCount == 1) "product uses it" else "products use it"
                 DeleteCategoryUseCase.Result.NotFound ->
                     _error.value = "Category no longer exists"
-                DeleteCategoryUseCase.Result.Success -> Unit
+                DeleteCategoryUseCase.Result.Success ->
+                    snackbarController.showSuccess("Category \"${category.name}\" deleted")
             }
         }
     }

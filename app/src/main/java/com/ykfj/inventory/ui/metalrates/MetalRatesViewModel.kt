@@ -32,6 +32,7 @@ class MetalRatesViewModel @Inject constructor(
     private val updateMetalRate: UpdateMetalRateUseCase,
     private val deleteMetalRate: DeleteMetalRateUseCase,
     private val sessionManager: SessionManager,
+    private val snackbarController: com.ykfj.inventory.ui.components.SnackbarController,
 ) : ViewModel() {
 
     private val _formState = MutableStateFlow(FormState())
@@ -90,6 +91,7 @@ class MetalRatesViewModel @Inject constructor(
         viewModelScope.launch {
             if (editing == null) {
                 addMetalRate(name = name, pricePerGram = pricePerGram, actorUserId = userId)
+                snackbarController.showSuccess("Metal rate \"$name\" added")
             } else {
                 updateMetalRate(
                     id = editing.id,
@@ -97,6 +99,7 @@ class MetalRatesViewModel @Inject constructor(
                     pricePerGram = pricePerGram,
                     actorUserId = userId,
                 )
+                snackbarController.showSuccess("Metal rate \"$name\" updated · all weighted items repriced")
             }
             closeForm()
         }
@@ -111,7 +114,8 @@ class MetalRatesViewModel @Inject constructor(
                         if (r.activeProductCount == 1) "product uses it" else "products use it"
                 DeleteMetalRateUseCase.Result.NotFound ->
                     _error.value = "Metal rate no longer exists"
-                DeleteMetalRateUseCase.Result.Success -> Unit
+                DeleteMetalRateUseCase.Result.Success ->
+                    snackbarController.showSuccess("Metal rate \"${rate.name}\" deleted")
             }
         }
     }

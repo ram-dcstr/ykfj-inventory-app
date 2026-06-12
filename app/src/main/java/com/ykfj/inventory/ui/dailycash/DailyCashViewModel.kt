@@ -10,6 +10,8 @@ import com.ykfj.inventory.data.local.db.enums.UserRole
 import com.ykfj.inventory.domain.model.CashMovement
 import com.ykfj.inventory.domain.repository.CashMovementRepository
 import com.ykfj.inventory.ui.auth.SessionManager
+import com.ykfj.inventory.ui.components.SnackbarController
+import com.ykfj.inventory.util.CurrencyFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -46,6 +48,7 @@ class DailyCashViewModel @Inject constructor(
     private val db: YkfjDatabase,
     private val cashMovementRepository: CashMovementRepository,
     private val sessionManager: SessionManager,
+    private val snackbarController: SnackbarController,
 ) : ViewModel() {
 
     private val _selectedDay = MutableStateFlow(startOfDay(System.currentTimeMillis()))
@@ -120,31 +123,40 @@ class DailyCashViewModel @Inject constructor(
     fun today() = selectDay(System.currentTimeMillis())
 
     /** Admin/Manager: edits the CHANGE_FLOAT row for the current day. Creates one if absent. */
-    fun editChangeFloat(amount: Double) = upsertOnePerDay(CashMovementType.CHANGE_FLOAT, amount)
+    fun editChangeFloat(amount: Double) =
+        upsertOnePerDay(CashMovementType.CHANGE_FLOAT, amount, "Change float set to ${CurrencyFormatter.format(amount)}")
 
     /** Admin/Manager: edits the PURCHASE_FLOAT row for the current day. Creates one if absent. */
-    fun setPurchaseFloat(amount: Double) = upsertOnePerDay(CashMovementType.PURCHASE_FLOAT, amount)
+    fun setPurchaseFloat(amount: Double) =
+        upsertOnePerDay(CashMovementType.PURCHASE_FLOAT, amount, "Purchase float set to ${CurrencyFormatter.format(amount)}")
 
     /** Admin/Manager: appends an expense. Notes required by UI gate. */
     fun addExpense(amount: Double, notes: String) {
         if (amount <= 0 || notes.isBlank()) return
-        appendMovement(CashMovementType.EXPENSE, -amount, notes)
+        appendMovement(CashMovementType.EXPENSE, -amount, notes, "Expense ${CurrencyFormatter.format(amount)} recorded")
     }
 
     /** Admin only: appends a positive or negative adjustment. Notes required by UI gate. */
     fun addAdjustment(amount: Double, notes: String) {
         if (amount == 0.0 || notes.isBlank()) return
-        appendMovement(CashMovementType.ADJUSTMENT, amount, notes)
+        appendMovement(
+            CashMovementType.ADJUSTMENT, amount, notes,
+            if (amount >= 0) "Adjustment +${CurrencyFormatter.format(amount)} recorded"
+            else "Adjustment ${CurrencyFormatter.format(amount)} recorded",
+        )
     }
 
     /** Admin: removes a recorded expense or adjustment. */
     fun deleteMovement(id: String) {
-        viewModelScope.launch { cashMovementRepository.softDelete(id) }
+        viewModelScope.launch {
+            cashMovementRepository.softDelete(id)
+            snackbarController.showSuccess("Entry deleted")
+        }
     }
 
     // ── Internal ──────────────────────────────────────────────────────────────
 
-    private fun upsertOnePerDay(type: CashMovementType, amount: Double) {
+    private fun upsertOnePerDay(type: CashMovementType, amount: Double, successMessage: String) {
         if (amount < 0) return
         val day = _selectedDay.value
         viewModelScope.launch {
@@ -164,10 +176,11 @@ class DailyCashViewModel @Inject constructor(
                     updatedAt = now,
                 )
             cashMovementRepository.upsert(movement)
+            snackbarController.showSuccess(successMessage)
         }
     }
 
-    private fun appendMovement(type: CashMovementType, signedAmount: Double, notes: String) {
+    private fun appendMovement(type: CashMovementType, signedAmount: Double, notes: String, successMessage: String) {
         val day = _selectedDay.value
         viewModelScope.launch {
             val userId = sessionManager.currentUser.value?.id ?: return@launch
@@ -185,6 +198,7 @@ class DailyCashViewModel @Inject constructor(
                     updatedAt = now,
                 ),
             )
+            snackbarController.showSuccess(successMessage)
         }
     }
 

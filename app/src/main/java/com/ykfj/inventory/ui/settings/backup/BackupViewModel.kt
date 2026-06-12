@@ -30,6 +30,7 @@ data class BackupUiState(
 class BackupViewModel @Inject constructor(
     private val backupManager: BackupManager,
     private val sessionManager: SessionManager,
+    private val snackbarController: com.ykfj.inventory.ui.components.SnackbarController,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(BackupUiState())
@@ -59,14 +60,17 @@ class BackupViewModel @Inject constructor(
         _state.update { it.copy(isWorking = true, infoMessage = null, errorMessage = null) }
         viewModelScope.launch {
             when (val r = backupManager.createManualBackup()) {
-                is BackupManager.CreateResult.Success ->
+                is BackupManager.CreateResult.Success -> {
+                    val msg = "Backup saved to Downloads · ${r.displayName}"
                     _state.update {
                         it.copy(
                             isWorking = false,
-                            infoMessage = "Backup saved to Downloads: ${r.displayName}",
+                            infoMessage = msg,
                             lastManualAt = backupManager.lastManualBackupAt(),
                         )
                     }
+                    snackbarController.showSuccess(msg)
+                }
                 is BackupManager.CreateResult.Failed ->
                     _state.update {
                         it.copy(isWorking = false, errorMessage = "Backup failed: ${r.message}")
@@ -90,7 +94,7 @@ class BackupViewModel @Inject constructor(
                 return@launch
             }
             when (val r = backupManager.restoreFromZip(uri)) {
-                BackupManager.RestoreResult.Success ->
+                BackupManager.RestoreResult.Success -> {
                     _state.update {
                         it.copy(
                             isWorking = false,
@@ -98,6 +102,8 @@ class BackupViewModel @Inject constructor(
                             pendingRestart = true,
                         )
                     }
+                    snackbarController.showSuccess("Restore complete · restart the app to load the new data")
+                }
                 is BackupManager.RestoreResult.InvalidArchive ->
                     _state.update { it.copy(isWorking = false, errorMessage = r.message) }
                 is BackupManager.RestoreResult.Failed ->

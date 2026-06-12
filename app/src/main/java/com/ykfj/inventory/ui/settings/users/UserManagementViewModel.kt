@@ -33,6 +33,7 @@ class UserManagementViewModel @Inject constructor(
     userRepository: UserRepository,
     private val manageUsers: ManageUsersUseCase,
     private val sessionManager: SessionManager,
+    private val snackbarController: com.ykfj.inventory.ui.components.SnackbarController,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(UserManagementUiState())
@@ -94,8 +95,10 @@ class UserManagementViewModel @Inject constructor(
 
     private fun handleResult(result: ManageUsersUseCase.Result, success: String) {
         when (result) {
-            is ManageUsersUseCase.Result.Success ->
+            is ManageUsersUseCase.Result.Success -> {
                 _state.update { it.copy(isWorking = false, infoMessage = success) }
+                snackbarController.showSuccess(success)
+            }
             ManageUsersUseCase.Result.UsernameTaken ->
                 _state.update { it.copy(isWorking = false, errorMessage = "That username is already in use") }
             ManageUsersUseCase.Result.InvalidUsername ->

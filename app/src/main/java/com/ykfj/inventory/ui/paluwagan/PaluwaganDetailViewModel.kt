@@ -61,6 +61,7 @@ class PaluwaganDetailViewModel @Inject constructor(
     private val completeGroup: CompletePaluwaganGroupUseCase,
     private val deleteGroup: DeletePaluwaganGroupUseCase,
     private val sessionManager: SessionManager,
+    private val snackbarController: com.ykfj.inventory.ui.components.SnackbarController,
 ) : ViewModel() {
 
     private val groupId: String = checkNotNull(savedStateHandle["groupId"])
@@ -119,6 +120,8 @@ class PaluwaganDetailViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching {
                 addSlot(AddPaluwaganSlotUseCase.Params(groupId, customerId, nextPosition, userId))
+            }.onSuccess {
+                snackbarController.showSuccess("Member added · position $nextPosition")
             }.onFailure { _error.value = it.message ?: "Failed to add member" }
         }
     }
@@ -132,11 +135,14 @@ class PaluwaganDetailViewModel @Inject constructor(
         val userId = sessionManager.currentUser.value?.id ?: return
         val startPosition = uiState.value.slotRows.size + 1
         viewModelScope.launch {
+            var added = 0
             customerIds.forEachIndexed { index, customerId ->
                 runCatching {
                     addSlot(AddPaluwaganSlotUseCase.Params(groupId, customerId, startPosition + index, userId))
-                }.onFailure { _error.value = it.message ?: "Failed to add member" }
+                }.onSuccess { added++ }
+                    .onFailure { _error.value = it.message ?: "Failed to add member" }
             }
+            if (added > 0) snackbarController.showSuccess("$added member${if (added == 1) "" else "s"} added")
         }
     }
 
@@ -193,7 +199,10 @@ class PaluwaganDetailViewModel @Inject constructor(
             ) {
                 RecordPaluwaganPaymentUseCase.Result.AlreadyPaid ->
                     _error.value = "Payment already recorded for this round"
-                RecordPaluwaganPaymentUseCase.Result.Success -> Unit
+                RecordPaluwaganPaymentUseCase.Result.Success ->
+                    snackbarController.showSuccess(
+                        "Payment ${com.ykfj.inventory.util.CurrencyFormatter.format(amountPaid)} recorded for round $roundNumber",
+                    )
             }
         }
     }
@@ -201,9 +210,11 @@ class PaluwaganDetailViewModel @Inject constructor(
     fun advanceRound() {
         val userId = sessionManager.currentUser.value?.id ?: return
         viewModelScope.launch {
-            when (advanceRound(AdvancePaluwaganRoundUseCase.Params(groupId, userId))) {
-                is AdvancePaluwaganRoundUseCase.Result.Advanced -> Unit
-                AdvancePaluwaganRoundUseCase.Result.Completed -> Unit
+            when (val r = advanceRound(AdvancePaluwaganRoundUseCase.Params(groupId, userId))) {
+                is AdvancePaluwaganRoundUseCase.Result.Advanced ->
+                    snackbarController.showSuccess("Advanced to round ${r.newRound}")
+                AdvancePaluwaganRoundUseCase.Result.Completed ->
+                    snackbarController.showSuccess("Group completed · all rounds collected")
                 AdvancePaluwaganRoundUseCase.Result.GroupNotFound ->
                     _error.value = "Group not found"
             }
@@ -214,6 +225,7 @@ class PaluwaganDetailViewModel @Inject constructor(
         val userId = sessionManager.currentUser.value?.id ?: return
         viewModelScope.launch {
             completeGroup(CompletePaluwaganGroupUseCase.Params(groupId, userId))
+            snackbarController.showSuccess("Paluwagan group completed")
         }
     }
 
@@ -223,6 +235,7 @@ class PaluwaganDetailViewModel @Inject constructor(
             runCatching {
                 deleteGroup(DeletePaluwaganGroupUseCase.Params(groupId, userId))
             }.onSuccess {
+                snackbarController.showSuccess("Paluwagan group deleted")
                 _navigateBack.value = true
             }.onFailure {
                 _error.value = it.message ?: "Failed to delete group"
@@ -250,6 +263,8 @@ class PaluwaganDetailViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching {
                 paluwaganRepository.updatePaymentFull(paymentId, status, paymentDate, amountPaid, paymentMethod, notes)
+            }.onSuccess {
+                snackbarController.showSuccess("Payment updated")
             }.onFailure { _error.value = it.message ?: "Failed to update payment" }
         }
     }
@@ -259,6 +274,8 @@ class PaluwaganDetailViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching {
                 paluwaganRepository.recordPotCollection(slotId, date)
+            }.onSuccess {
+                snackbarController.showSuccess("Pot collection recorded")
             }.onFailure { _error.value = it.message ?: "Failed to record pot collection" }
         }
     }
@@ -268,6 +285,8 @@ class PaluwaganDetailViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching {
                 paluwaganRepository.updateSlotCustomer(slotId, newCustomerId)
+            }.onSuccess {
+                snackbarController.showSuccess("Slot member swapped (pasalo)")
             }.onFailure { _error.value = it.message ?: "Failed to update member" }
         }
     }

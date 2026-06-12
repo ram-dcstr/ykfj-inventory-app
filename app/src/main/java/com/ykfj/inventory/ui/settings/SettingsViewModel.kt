@@ -20,6 +20,8 @@ import com.ykfj.inventory.data.repository.DeviceRoleManager
 import com.ykfj.inventory.domain.sync.DeviceRole
 import com.ykfj.inventory.ui.auth.IdleTimeout
 import com.ykfj.inventory.ui.auth.SessionManager
+import com.ykfj.inventory.ui.components.SnackbarController
+import com.ykfj.inventory.util.CurrencyFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -82,6 +84,7 @@ class SettingsViewModel @Inject constructor(
     private val nsdDiscovery: NsdDiscovery,
     private val sessionManager: SessionManager,
     private val db: YkfjDatabase,
+    private val snackbarController: SnackbarController,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -256,6 +259,7 @@ class SettingsViewModel @Inject constructor(
                 tabletIp = tabletIp.trim(),
                 syncUsername = syncUsername.trim(),
             ) }
+            snackbarController.showSuccess("Sync settings saved")
         }
     }
 
@@ -273,6 +277,7 @@ class SettingsViewModel @Inject constructor(
             db.appSettingsDao().upsert(
                 AppSettingsEntity(key = AppSettingKeys.SESSION_TIMEOUT, value = timeout.name)
             )
+            snackbarController.showSuccess("Idle timeout set to ${timeout.label}")
         }
     }
 
@@ -285,6 +290,7 @@ class SettingsViewModel @Inject constructor(
                 AppSettingsEntity(key = AppSettingKeys.DAILY_EXPORT_PASSWORD, value = trimmed)
             )
             _uiState.update { it.copy(dailyExportPassword = trimmed) }
+            snackbarController.showSuccess("Daily export password updated")
         }
     }
 
@@ -300,6 +306,7 @@ class SettingsViewModel @Inject constructor(
                 AppSettingsEntity(key = AppSettingKeys.DEFAULT_CHANGE_FLOAT, value = amount.toString())
             )
             _uiState.update { it.copy(defaultChangeFloat = amount) }
+            snackbarController.showSuccess("Default change float set to ${CurrencyFormatter.format(amount)}")
         }
     }
 }

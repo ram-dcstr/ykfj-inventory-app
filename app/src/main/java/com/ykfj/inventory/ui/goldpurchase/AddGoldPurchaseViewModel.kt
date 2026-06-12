@@ -6,6 +6,8 @@ import com.ykfj.inventory.domain.model.Customer
 import com.ykfj.inventory.domain.repository.CustomerRepository
 import com.ykfj.inventory.domain.usecase.goldpurchase.AddGoldPurchaseUseCase
 import com.ykfj.inventory.ui.auth.SessionManager
+import com.ykfj.inventory.ui.components.SnackbarController
+import com.ykfj.inventory.util.CurrencyFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -53,6 +55,7 @@ class AddGoldPurchaseViewModel @Inject constructor(
     private val addGoldPurchaseUseCase: AddGoldPurchaseUseCase,
     private val customerRepository: CustomerRepository,
     private val sessionManager: SessionManager,
+    private val snackbarController: SnackbarController,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AddGoldPurchaseUiState())
@@ -121,8 +124,12 @@ class AddGoldPurchaseViewModel @Inject constructor(
                     recordedBy = userId,
                 ),
             )) {
-                is AddGoldPurchaseUseCase.Result.Success ->
+                is AddGoldPurchaseUseCase.Result.Success -> {
+                    snackbarController.showSuccess(
+                        "Gold purchase recorded · ${s.items.size} item${if (s.items.size == 1) "" else "s"} · ${CurrencyFormatter.format(s.totalPaid)}",
+                    )
                     _state.value = _state.value.copy(isSaving = false, savedId = r.recordId)
+                }
                 AddGoldPurchaseUseCase.Result.NoItems ->
                     _state.value = _state.value.copy(isSaving = false, error = "At least one item required")
                 AddGoldPurchaseUseCase.Result.InvalidItem ->

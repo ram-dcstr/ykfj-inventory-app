@@ -32,6 +32,7 @@ import com.ykfj.inventory.domain.usecase.product.MarkAsSoldUseCase
 import com.ykfj.inventory.domain.usecase.product.RevertStatusUseCase
 import com.ykfj.inventory.domain.usecase.supplier.GetSuppliersUseCase
 import com.ykfj.inventory.ui.auth.SessionManager
+import com.ykfj.inventory.ui.components.SnackbarController
 import com.ykfj.inventory.ui.goldpurchase.GoldPurchaseItemDraft
 import com.ykfj.inventory.util.CurrencyFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -90,6 +91,7 @@ class ProductDetailViewModel @Inject constructor(
     private val markAsDamaged: MarkAsDamagedUseCase,
     private val revertStatus: RevertStatusUseCase,
     private val sessionManager: SessionManager,
+    private val snackbarController: SnackbarController,
 ) : ViewModel() {
 
     private val productId: String = checkNotNull(savedStateHandle["productId"])
@@ -219,7 +221,12 @@ class ProductDetailViewModel @Inject constructor(
                     ),
                 )
                 when (result) {
-                    is MarkAsSoldUseCase.Result.Success -> dismissDialog()
+                    is MarkAsSoldUseCase.Result.Success -> {
+                        snackbarController.showSuccess(
+                            "Sale of ${CurrencyFormatter.format(soldPrice * quantity)} recorded",
+                        )
+                        dismissDialog()
+                    }
                     MarkAsSoldUseCase.Result.ProductNotFound -> _actionError.value = "Product not found"
                     MarkAsSoldUseCase.Result.InsufficientQuantity -> _actionError.value = "Not enough units available"
                 }
@@ -252,7 +259,20 @@ class ProductDetailViewModel @Inject constructor(
                     ),
                 )
                 when (result) {
-                    is SellWithTradeInUseCase.Result.Success -> dismissDialog()
+                    is SellWithTradeInUseCase.Result.Success -> {
+                        val saleTotal = soldPrice * quantity
+                        val tradeInTotal = tradeInItems.sumOf {
+                            it.finalValue ?: 0.0
+                        }
+                        val net = saleTotal - tradeInTotal
+                        val summary = when {
+                            net > 0 -> "Trade-in sale recorded · customer paid ${CurrencyFormatter.format(net)}"
+                            net < 0 -> "Trade-in sale recorded · shop paid out ${CurrencyFormatter.format(-net)}"
+                            else -> "Trade-in sale recorded · even swap"
+                        }
+                        snackbarController.showSuccess(summary)
+                        dismissDialog()
+                    }
                     SellWithTradeInUseCase.Result.ProductNotFound -> _actionError.value = "Product not found"
                     SellWithTradeInUseCase.Result.InsufficientQuantity -> _actionError.value = "Not enough units available"
                     SellWithTradeInUseCase.Result.NoItems -> _actionError.value = "Add at least one trade-in item"
@@ -287,6 +307,13 @@ class ProductDetailViewModel @Inject constructor(
                             ),
                         )
                     }
+                    val totalDue = unitPrice * quantity
+                    val msg = if (downpayment != null && downpayment > 0) {
+                        "Layaway created · downpayment ${CurrencyFormatter.format(downpayment)} of ${CurrencyFormatter.format(totalDue)}"
+                    } else {
+                        "Layaway created · total ${CurrencyFormatter.format(totalDue)}"
+                    }
+                    snackbarController.showSuccess(msg)
                     dismissDialog()
                 }
                 MarkAsLayawayUseCase.Result.ProductNotFound -> _actionError.value = "Product not found"
@@ -307,7 +334,10 @@ class ProductDetailViewModel @Inject constructor(
                 ),
             )
             when (result) {
-                is MarkAsDamagedUseCase.Result.Success -> dismissDialog()
+                is MarkAsDamagedUseCase.Result.Success -> {
+                    snackbarController.showSuccess("Marked as damaged · 1 unit moved to Damaged screen")
+                    dismissDialog()
+                }
                 MarkAsDamagedUseCase.Result.ProductNotFound -> _actionError.value = "Product not found"
                 MarkAsDamagedUseCase.Result.NoUnitsAvailable -> _actionError.value = "No units available"
             }
@@ -320,7 +350,10 @@ class ProductDetailViewModel @Inject constructor(
                 RevertStatusUseCase.Params(productId = productId, reason = reason),
             )
             when (result) {
-                RevertStatusUseCase.Result.Success -> dismissDialog()
+                RevertStatusUseCase.Result.Success -> {
+                    snackbarController.showSuccess("Reverted · product restored to inventory")
+                    dismissDialog()
+                }
                 RevertStatusUseCase.Result.ProductNotFound -> _actionError.value = "Product not found"
                 RevertStatusUseCase.Result.NoRecordToRevert -> _actionError.value = "No record to revert"
                 is RevertStatusUseCase.Result.Error -> _actionError.value = result.message

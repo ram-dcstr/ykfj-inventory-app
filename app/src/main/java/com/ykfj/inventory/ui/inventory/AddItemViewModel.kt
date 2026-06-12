@@ -16,6 +16,7 @@ import com.ykfj.inventory.domain.usecase.product.AddProductUseCase
 import com.ykfj.inventory.domain.usecase.product.UpdateProductUseCase
 import com.ykfj.inventory.domain.usecase.supplier.GetSuppliersUseCase
 import com.ykfj.inventory.ui.auth.SessionManager
+import com.ykfj.inventory.ui.components.SnackbarController
 import com.ykfj.inventory.util.CurrencyFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,6 +59,7 @@ class AddItemViewModel @Inject constructor(
     private val addProduct: AddProductUseCase,
     private val updateProduct: UpdateProductUseCase,
     private val sessionManager: SessionManager,
+    private val snackbarController: SnackbarController,
 ) : ViewModel() {
 
     /** Null = add mode, non-null = edit mode. */
@@ -196,6 +198,9 @@ class AddItemViewModel @Inject constructor(
                     }
                 }
                 _saveState.value = _saveState.value.copy(isSaving = false, savedProductId = productId)
+                snackbarController.showSuccess(
+                    if (editProductId == null) "Product \"$name\" added" else "Product \"$name\" updated",
+                )
             } catch (e: Exception) {
                 _saveState.value = _saveState.value.copy(isSaving = false, error = e.message ?: "Save failed")
             }

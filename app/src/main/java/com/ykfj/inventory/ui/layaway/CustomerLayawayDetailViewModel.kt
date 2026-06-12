@@ -79,6 +79,7 @@ class CustomerLayawayDetailViewModel @Inject constructor(
     private val deletePaymentUseCase: DeleteLayawayPaymentUseCase,
     private val revertCompletedLayawayUseCase: RevertCompletedLayawayUseCase,
     private val sessionManager: SessionManager,
+    private val snackbarController: com.ykfj.inventory.ui.components.SnackbarController,
 ) : ViewModel() {
 
     private val customerId: String = checkNotNull(savedStateHandle["customerId"])
@@ -139,7 +140,7 @@ class CustomerLayawayDetailViewModel @Inject constructor(
         viewModelScope.launch {
             when (val r = addPaymentUseCase(AddLayawayPaymentUseCase.Params(layawayId, amount, notes, userId, paymentMethod = paymentMethod))) {
                 AddLayawayPaymentUseCase.Result.Success ->
-                    _local.value = _local.value.copy(success = "Payment added")
+                    snackbarController.showSuccess("Payment ${com.ykfj.inventory.util.CurrencyFormatter.format(amount)} added")
                 AddLayawayPaymentUseCase.Result.RecordNotFound ->
                     _local.value = _local.value.copy(error = "Record not found")
                 AddLayawayPaymentUseCase.Result.AlreadyCompleted ->
@@ -157,7 +158,7 @@ class CustomerLayawayDetailViewModel @Inject constructor(
                 SplitLayawayPaymentUseCase.Params(allocations, customerId, userId, paymentMethod = paymentMethod),
             )) {
                 SplitLayawayPaymentUseCase.Result.Success ->
-                    _local.value = _local.value.copy(success = "Split payment applied")
+                    snackbarController.showSuccess("Split payment applied across ${allocations.size} layaways")
                 is SplitLayawayPaymentUseCase.Result.Error ->
                     _local.value = _local.value.copy(error = r.message)
             }
@@ -169,7 +170,7 @@ class CustomerLayawayDetailViewModel @Inject constructor(
         viewModelScope.launch {
             when (val r = completeLayawayUseCase(CompleteLayawayUseCase.Params(layawayId, userId))) {
                 CompleteLayawayUseCase.Result.Success ->
-                    _local.value = _local.value.copy(success = "Layaway marked as completed")
+                    snackbarController.showSuccess("Layaway completed · moved to Sold archive")
                 CompleteLayawayUseCase.Result.RecordNotFound ->
                     _local.value = _local.value.copy(error = "Record not found")
                 CompleteLayawayUseCase.Result.NotActive ->
@@ -185,7 +186,7 @@ class CustomerLayawayDetailViewModel @Inject constructor(
         viewModelScope.launch {
             when (val r = cancelLayawayUseCase(CancelLayawayUseCase.Params(layawayId, userId))) {
                 CancelLayawayUseCase.Result.Success ->
-                    _local.value = _local.value.copy(success = "Layaway cancelled")
+                    snackbarController.showSuccess("Layaway cancelled · product returned to inventory")
                 CancelLayawayUseCase.Result.RecordNotFound ->
                     _local.value = _local.value.copy(error = "Record not found")
                 CancelLayawayUseCase.Result.NotActive ->
@@ -203,7 +204,7 @@ class CustomerLayawayDetailViewModel @Inject constructor(
                 RevertCompletedLayawayUseCase.Params(layawayId, userId),
             )) {
                 RevertCompletedLayawayUseCase.Result.Success ->
-                    _local.value = _local.value.copy(success = "Layaway reverted to active")
+                    snackbarController.showSuccess("Layaway reverted to active")
                 RevertCompletedLayawayUseCase.Result.RecordNotFound ->
                     _local.value = _local.value.copy(error = "Record not found")
                 RevertCompletedLayawayUseCase.Result.NotCompleted ->
@@ -220,7 +221,10 @@ class CustomerLayawayDetailViewModel @Inject constructor(
             when (val r = deletePaymentUseCase(
                 DeleteLayawayPaymentUseCase.Params(transactionId, layawayId, userId),
             )) {
-                DeleteLayawayPaymentUseCase.Result.Success -> { /* observeForCustomer auto-refreshes */ }
+                DeleteLayawayPaymentUseCase.Result.Success -> {
+                    snackbarController.showSuccess("Payment deleted")
+                    /* observeForCustomer auto-refreshes */
+                }
                 is DeleteLayawayPaymentUseCase.Result.Error ->
                     _local.value = _local.value.copy(error = r.message)
             }

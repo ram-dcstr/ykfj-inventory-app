@@ -53,6 +53,7 @@ class PaluwaganViewModel @Inject constructor(
     private val paluwaganRepository: PaluwaganRepository,
     private val customerRepository: CustomerRepository,
     private val sessionManager: SessionManager,
+    private val snackbarController: com.ykfj.inventory.ui.components.SnackbarController,
 ) : ViewModel() {
 
     private val _groupRows = MutableStateFlow<List<PaluwaganGroupRow>>(emptyList())
@@ -133,6 +134,8 @@ class PaluwaganViewModel @Inject constructor(
                         actorUserId = userId,
                     ),
                 )
+            }.onSuccess {
+                snackbarController.showSuccess("Paluwagan group \"$name\" created")
             }.onFailure { e ->
                 _error.value = e.message ?: "Failed to create group"
             }
@@ -143,6 +146,8 @@ class PaluwaganViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching {
                 paluwaganRepository.hardDeleteGroup(groupId)
+            }.onSuccess {
+                snackbarController.showSuccess("Paluwagan group deleted")
             }.onFailure { _error.value = it.message ?: "Failed to delete group" }
         }
     }

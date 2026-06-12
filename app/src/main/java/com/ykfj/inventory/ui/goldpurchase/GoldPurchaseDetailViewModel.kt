@@ -13,6 +13,8 @@ import com.ykfj.inventory.domain.usecase.goldpurchase.RevertGoldPurchaseUseCase
 import com.ykfj.inventory.domain.usecase.goldpurchase.RevertTradeInUseCase
 import com.ykfj.inventory.domain.usecase.goldpurchase.UnmarkGoldSoldToSupplierUseCase
 import com.ykfj.inventory.ui.auth.SessionManager
+import com.ykfj.inventory.ui.components.SnackbarController
+import com.ykfj.inventory.util.CurrencyFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -52,6 +54,7 @@ class GoldPurchaseDetailViewModel @Inject constructor(
     private val unmarkSoldUseCase: UnmarkGoldSoldToSupplierUseCase,
     private val customerRepository: CustomerRepository,
     private val sessionManager: SessionManager,
+    private val snackbarController: SnackbarController,
 ) : ViewModel() {
 
     private val purchaseId: String = checkNotNull(savedStateHandle["purchaseId"])
@@ -121,8 +124,10 @@ class GoldPurchaseDetailViewModel @Inject constructor(
                     actorUserId = userId,
                 ),
             )) {
-                RevertGoldPurchaseUseCase.Result.Success ->
+                RevertGoldPurchaseUseCase.Result.Success -> {
+                    snackbarController.showSuccess("Gold purchase reverted")
                     _extras.value = _extras.value.copy(isReverting = false, isReverted = true)
+                }
                 RevertGoldPurchaseUseCase.Result.NotFound ->
                     _extras.value = _extras.value.copy(isReverting = false, revertError = "Purchase not found")
                 RevertGoldPurchaseUseCase.Result.IsTradeIn ->
@@ -150,8 +155,10 @@ class GoldPurchaseDetailViewModel @Inject constructor(
                     actorUserId = userId,
                 ),
             )) {
-                RevertTradeInUseCase.Result.Success ->
+                RevertTradeInUseCase.Result.Success -> {
+                    snackbarController.showSuccess("Trade-in reverted · sale and stock restored")
                     _extras.value = _extras.value.copy(isReverting = false, isReverted = true)
+                }
                 RevertTradeInUseCase.Result.NotFound ->
                     _extras.value = _extras.value.copy(isReverting = false, revertError = "Trade-in record or its linked sale could not be found")
                 is RevertTradeInUseCase.Result.Error ->
@@ -179,6 +186,10 @@ class GoldPurchaseDetailViewModel @Inject constructor(
                 isReverting = false,
                 revertError = if (failures > 0) "Failed to revert $failures item(s)" else null,
             )
+            val reverted = soldItemIds.size - failures
+            if (reverted > 0) {
+                snackbarController.showSuccess("$reverted item${if (reverted == 1) "" else "s"} returned to stock")
+            }
         }
     }
 
@@ -192,7 +203,8 @@ class GoldPurchaseDetailViewModel @Inject constructor(
             when (val result = markSoldUseCase(
                 MarkGoldSoldToSupplierUseCase.Params(itemId, supplierPrice, userId),
             )) {
-                MarkGoldSoldToSupplierUseCase.Result.Success -> Unit
+                MarkGoldSoldToSupplierUseCase.Result.Success ->
+                    snackbarController.showSuccess("Marked sold to supplier · ${CurrencyFormatter.format(supplierPrice)}")
                 MarkGoldSoldToSupplierUseCase.Result.InvalidPrice ->
                     _extras.value = _extras.value.copy(revertError = "Supplier price must be greater than 0")
                 is MarkGoldSoldToSupplierUseCase.Result.Error ->
@@ -207,7 +219,8 @@ class GoldPurchaseDetailViewModel @Inject constructor(
             when (val result = unmarkSoldUseCase(
                 UnmarkGoldSoldToSupplierUseCase.Params(itemId, userId),
             )) {
-                UnmarkGoldSoldToSupplierUseCase.Result.Success -> Unit
+                UnmarkGoldSoldToSupplierUseCase.Result.Success ->
+                    snackbarController.showSuccess("Item returned to stock")
                 is UnmarkGoldSoldToSupplierUseCase.Result.Error ->
                     _extras.value = _extras.value.copy(revertError = result.message)
             }

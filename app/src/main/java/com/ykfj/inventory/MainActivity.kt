@@ -41,6 +41,8 @@ import com.ykfj.inventory.data.repository.DeviceRoleManager
 import com.ykfj.inventory.domain.sync.DeviceRole
 import com.ykfj.inventory.ui.auth.LoginScreen
 import com.ykfj.inventory.ui.auth.SessionManager
+import com.ykfj.inventory.ui.components.AppSnackbarHost
+import com.ykfj.inventory.ui.components.SnackbarController
 import com.ykfj.inventory.ui.navigation.NavGraph
 import com.ykfj.inventory.ui.navigation.Screen
 import com.ykfj.inventory.ui.navigation.SidebarContent
@@ -65,6 +67,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var deviceRoleManager: DeviceRoleManager
+
+    @Inject
+    lateinit var snackbarController: SnackbarController
 
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -97,6 +102,7 @@ class MainActivity : ComponentActivity() {
                         syncManager = syncManager,
                         syncServerManager = syncServerManager,
                         deviceRoleManager = deviceRoleManager,
+                        snackbarController = snackbarController,
                     )
                 }
             }
@@ -119,6 +125,7 @@ private fun AppShell(
     syncManager: SyncManager,
     syncServerManager: SyncServerManager,
     deviceRoleManager: DeviceRoleManager,
+    snackbarController: SnackbarController,
 ) {
     val navController = rememberNavController()
     val currentUser by sessionManager.currentUser.collectAsStateWithLifecycle()
@@ -180,7 +187,9 @@ private fun AppShell(
                 isServerRunning = isServerRunning,
                 onSyncTap = onSyncTap,
             )
-            Scaffold { padding ->
+            Scaffold(
+                snackbarHost = { AppSnackbarHost(snackbarController) },
+            ) { padding ->
                 NavGraph(
                     navController = navController,
                     modifier = Modifier.padding(padding),
@@ -227,6 +236,7 @@ private fun AppShell(
                         },
                     )
                 },
+                snackbarHost = { AppSnackbarHost(snackbarController) },
             ) { padding ->
                 NavGraph(
                     navController = navController,

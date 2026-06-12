@@ -67,6 +67,7 @@ class SoldArchiveViewModel @Inject constructor(
     private val productRepository: ProductRepository,
     private val customerRepository: CustomerRepository,
     private val sessionManager: SessionManager,
+    private val snackbarController: com.ykfj.inventory.ui.components.SnackbarController,
 ) : ViewModel() {
 
     private val _selectedDate = MutableStateFlow(
@@ -127,7 +128,12 @@ class SoldArchiveViewModel @Inject constructor(
         val userId = sessionManager.currentUser.value?.id ?: return
         viewModelScope.launch {
             when (val result = revertSold(RevertSoldUseCase.Params(soldId, quantity, reason, userId))) {
-                RevertSoldUseCase.Result.Success -> { /* Room Flow auto-refreshes the list */ }
+                RevertSoldUseCase.Result.Success -> {
+                    snackbarController.showSuccess(
+                        "Reverted $quantity unit${if (quantity == 1) "" else "s"} · stock restored",
+                    )
+                    /* Room Flow auto-refreshes the list */
+                }
                 RevertSoldUseCase.Result.RecordNotFound ->
                     _pageState.value = _pageState.value.copy(error = "Record not found")
                 is RevertSoldUseCase.Result.Error ->
@@ -141,11 +147,13 @@ class SoldArchiveViewModel @Inject constructor(
         viewModelScope.launch {
             _pageState.value = _pageState.value.copy(isExporting = true, error = null)
             when (val result = exportPdf(ExportDailySalesPdfUseCase.Params(_selectedDate.value, userId))) {
-                is ExportDailySalesPdfUseCase.Result.Success ->
+                is ExportDailySalesPdfUseCase.Result.Success -> {
                     _pageState.value = _pageState.value.copy(
                         isExporting = false,
                         exportedFilename = result.filename,
                     )
+                    snackbarController.showSuccess("Daily sales PDF exported · ${result.filename}")
+                }
                 is ExportDailySalesPdfUseCase.Result.Error ->
                     _pageState.value = _pageState.value.copy(
                         isExporting = false,

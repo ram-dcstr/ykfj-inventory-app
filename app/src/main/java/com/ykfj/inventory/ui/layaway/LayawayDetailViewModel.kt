@@ -18,6 +18,8 @@ import com.ykfj.inventory.domain.usecase.layaway.DeleteLayawayPaymentUseCase
 import com.ykfj.inventory.domain.usecase.layaway.SplitLayawayPaymentUseCase
 import com.ykfj.inventory.domain.usecase.layaway.UpdateLayawayUseCase
 import com.ykfj.inventory.ui.auth.SessionManager
+import com.ykfj.inventory.ui.components.SnackbarController
+import com.ykfj.inventory.util.CurrencyFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -54,6 +56,7 @@ class LayawayDetailViewModel @Inject constructor(
     private val cancelLayawayUseCase: CancelLayawayUseCase,
     private val deletePaymentUseCase: DeleteLayawayPaymentUseCase,
     private val sessionManager: SessionManager,
+    private val snackbarController: SnackbarController,
 ) : ViewModel() {
 
     private val layawayId: String = checkNotNull(savedStateHandle["layawayId"])
@@ -141,7 +144,14 @@ class LayawayDetailViewModel @Inject constructor(
         viewModelScope.launch {
             when (val r = addPaymentUseCase(AddLayawayPaymentUseCase.Params(layawayId, amount, notes, userId, paymentMethod = paymentMethod))) {
                 AddLayawayPaymentUseCase.Result.Success -> {
-                    _local.value = _local.value.copy(success = "Payment added")
+                    val newTotalPaid = (_local.value.record?.totalPaid ?: 0.0) + amount
+                    val unitPrice = _local.value.record?.unitPrice ?: 0.0
+                    val quantity = _local.value.record?.quantity ?: 1
+                    val totalDue = unitPrice * quantity
+                    val balance = (totalDue - newTotalPaid).coerceAtLeast(0.0)
+                    snackbarController.showSuccess(
+                        "Payment ${CurrencyFormatter.format(amount)} added · balance ${CurrencyFormatter.format(balance)}",
+                    )
                     refreshRecord()
                 }
                 AddLayawayPaymentUseCase.Result.RecordNotFound ->
@@ -162,7 +172,10 @@ class LayawayDetailViewModel @Inject constructor(
                 SplitLayawayPaymentUseCase.Params(allocations, record.customerId, userId, paymentMethod = paymentMethod),
             )) {
                 SplitLayawayPaymentUseCase.Result.Success -> {
-                    _local.value = _local.value.copy(success = "Split payment applied")
+                    val total = allocations.sumOf { it.amount }
+                    snackbarController.showSuccess(
+                        "Split payment ${CurrencyFormatter.format(total)} applied across ${allocations.size} layaways",
+                    )
                     refreshRecord()
                     loadOtherLayaways(record)
                 }
@@ -179,7 +192,7 @@ class LayawayDetailViewModel @Inject constructor(
                 UpdateLayawayUseCase.Params(layawayId, customerId, quantity, unitPrice, dueDate, userId),
             )) {
                 UpdateLayawayUseCase.Result.Success -> {
-                    _local.value = _local.value.copy(success = "Layaway updated")
+                    snackbarController.showSuccess("Layaway updated")
                     refreshRecord()
                 }
                 UpdateLayawayUseCase.Result.RecordNotFound ->
@@ -199,7 +212,7 @@ class LayawayDetailViewModel @Inject constructor(
         viewModelScope.launch {
             when (val r = completeLayawayUseCase(CompleteLayawayUseCase.Params(layawayId, userId))) {
                 CompleteLayawayUseCase.Result.Success -> {
-                    _local.value = _local.value.copy(success = "Layaway marked as completed")
+                    snackbarController.showSuccess("Layaway completed · moved to Sold archive")
                     refreshRecord()
                 }
                 CompleteLayawayUseCase.Result.RecordNotFound ->
@@ -217,7 +230,7 @@ class LayawayDetailViewModel @Inject constructor(
         viewModelScope.launch {
             when (val r = cancelLayawayUseCase(CancelLayawayUseCase.Params(layawayId, userId))) {
                 CancelLayawayUseCase.Result.Success -> {
-                    _local.value = _local.value.copy(success = "Layaway cancelled")
+                    snackbarController.showSuccess("Layaway cancelled · product returned to inventory")
                     refreshRecord()
                 }
                 CancelLayawayUseCase.Result.RecordNotFound ->
@@ -236,7 +249,10 @@ class LayawayDetailViewModel @Inject constructor(
             when (val r = deletePaymentUseCase(
                 DeleteLayawayPaymentUseCase.Params(transactionId, layawayId, userId),
             )) {
-                DeleteLayawayPaymentUseCase.Result.Success -> { /* Flow auto-refreshes transactions */ }
+                DeleteLayawayPaymentUseCase.Result.Success -> {
+                    snackbarController.showSuccess("Payment deleted")
+                    /* Flow auto-refreshes transactions */
+                }
                 is DeleteLayawayPaymentUseCase.Result.Error ->
                     _local.value = _local.value.copy(error = r.message)
             }

@@ -40,6 +40,7 @@ class SuppliersViewModel @Inject constructor(
     private val updateSupplier: UpdateSupplierUseCase,
     private val deleteSupplier: DeleteSupplierUseCase,
     private val sessionManager: SessionManager,
+    private val snackbarController: com.ykfj.inventory.ui.components.SnackbarController,
 ) : ViewModel() {
 
     private val _formState = MutableStateFlow(FormState())
@@ -101,6 +102,7 @@ class SuppliersViewModel @Inject constructor(
                     notes = input.notes,
                     actorUserId = userId,
                 )
+                snackbarController.showSuccess("Supplier \"${input.name}\" added")
             } else {
                 updateSupplier(
                     id = editing.id,
@@ -111,6 +113,7 @@ class SuppliersViewModel @Inject constructor(
                     notes = input.notes,
                     actorUserId = userId,
                 )
+                snackbarController.showSuccess("Supplier \"${input.name}\" updated")
             }
             closeForm()
         }
@@ -125,7 +128,8 @@ class SuppliersViewModel @Inject constructor(
                         if (r.activeProductCount == 1) "product uses it" else "products use it"
                 DeleteSupplierUseCase.Result.NotFound ->
                     _error.value = "Supplier no longer exists"
-                DeleteSupplierUseCase.Result.Success -> Unit
+                DeleteSupplierUseCase.Result.Success ->
+                    snackbarController.showSuccess("Supplier \"${supplier.name}\" deleted")
             }
         }
     }

@@ -55,6 +55,7 @@ class DamagedViewModel @Inject constructor(
     private val revertMeltUseCase: RevertMeltUseCase,
     private val productRepository: ProductRepository,
     private val sessionManager: SessionManager,
+    private val snackbarController: com.ykfj.inventory.ui.components.SnackbarController,
 ) : ViewModel() {
 
     private val _filter = MutableStateFlow(DamagedFilter.Active)
@@ -105,7 +106,10 @@ class DamagedViewModel @Inject constructor(
         val userId = sessionManager.currentUser.value?.id ?: return
         viewModelScope.launch {
             when (val result = revertDamaged(RevertDamagedUseCase.Params(damagedId, reason, userId))) {
-                RevertDamagedUseCase.Result.Success -> { /* Room Flow auto-refreshes */ }
+                RevertDamagedUseCase.Result.Success -> {
+                    snackbarController.showSuccess("Damaged item reverted · returned to stock")
+                    /* Room Flow auto-refreshes */
+                }
                 RevertDamagedUseCase.Result.RecordNotFound ->
                     _pageState.value = _pageState.value.copy(error = "Record not found")
                 is RevertDamagedUseCase.Result.Error ->
@@ -118,7 +122,10 @@ class DamagedViewModel @Inject constructor(
         val userId = sessionManager.currentUser.value?.id ?: return
         viewModelScope.launch {
             when (meltDamagedProduct(MeltDamagedProductUseCase.Params(damagedId, notes, userId))) {
-                MeltDamagedProductUseCase.Result.Success -> { /* Room Flow auto-refreshes */ }
+                MeltDamagedProductUseCase.Result.Success -> {
+                    snackbarController.showSuccess("Item melted · moved to Melted tab")
+                    /* Room Flow auto-refreshes */
+                }
                 MeltDamagedProductUseCase.Result.RecordNotFound ->
                     _pageState.value = _pageState.value.copy(error = "Record not found")
             }
@@ -129,7 +136,10 @@ class DamagedViewModel @Inject constructor(
         val userId = sessionManager.currentUser.value?.id ?: return
         viewModelScope.launch {
             when (revertMeltUseCase(RevertMeltUseCase.Params(damagedId, userId))) {
-                RevertMeltUseCase.Result.Success -> { /* Room Flow auto-refreshes */ }
+                RevertMeltUseCase.Result.Success -> {
+                    snackbarController.showSuccess("Melt reverted · item back in damaged list")
+                    /* Room Flow auto-refreshes */
+                }
                 RevertMeltUseCase.Result.RecordNotFound ->
                     _pageState.value = _pageState.value.copy(error = "Record not found")
             }

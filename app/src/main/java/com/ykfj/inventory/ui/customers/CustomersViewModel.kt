@@ -50,6 +50,7 @@ class CustomersViewModel @Inject constructor(
     private val addCustomer: AddCustomerUseCase,
     private val updateCustomer: UpdateCustomerUseCase,
     private val sessionManager: SessionManager,
+    private val snackbarController: com.ykfj.inventory.ui.components.SnackbarController,
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -129,6 +130,7 @@ class CustomersViewModel @Inject constructor(
                     notes = input.notes,
                     actorUserId = userId,
                 )
+                snackbarController.showSuccess("Customer \"${input.name}\" added")
             } else {
                 updateCustomer(
                     id = editing.id,
@@ -140,6 +142,7 @@ class CustomersViewModel @Inject constructor(
                     notes = input.notes,
                     actorUserId = userId,
                 )
+                snackbarController.showSuccess("Customer \"${input.name}\" updated")
             }
             closeForm()
         }

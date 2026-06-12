@@ -44,6 +44,7 @@ class ArchiveManagerViewModel @Inject constructor(
     private val exportArchive: ExportArchiveUseCase,
     private val purgeArchive: PurgeArchivedRecordsUseCase,
     private val sessionManager: SessionManager,
+    private val snackbarController: com.ykfj.inventory.ui.components.SnackbarController,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ArchiveManagerUiState())
@@ -101,19 +102,13 @@ class ArchiveManagerViewModel @Inject constructor(
                 is ExportArchiveUseCase.Result.Success -> {
                     if (thenPurge) {
                         val deleted = purgeArchive(s.type, s.startMillis, s.endMillis, actorId)
-                        _state.update {
-                            it.copy(
-                                isWorking = false,
-                                infoMessage = "Exported ${result.rowCount} → ${result.fileName}; purged $deleted",
-                            )
-                        }
+                        val msg = "Exported ${result.rowCount} rows → ${result.fileName} · purged $deleted"
+                        _state.update { it.copy(isWorking = false, infoMessage = msg) }
+                        snackbarController.showSuccess(msg)
                     } else {
-                        _state.update {
-                            it.copy(
-                                isWorking = false,
-                                infoMessage = "Exported ${result.rowCount} → ${result.fileName}",
-                            )
-                        }
+                        val msg = "Exported ${result.rowCount} rows → ${result.fileName}"
+                        _state.update { it.copy(isWorking = false, infoMessage = msg) }
+                        snackbarController.showSuccess(msg)
                     }
                     refreshPreview()
                 }
