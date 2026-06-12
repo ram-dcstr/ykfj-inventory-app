@@ -156,6 +156,8 @@ class PaluwaganDetailViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching {
                 reorderSlots(ReorderPaluwaganSlotsUseCase.Params(groupId, orderedSlotIds, userId))
+            }.onSuccess {
+                snackbarController.showSuccess("Member order saved")
             }.onFailure { _error.value = it.message ?: "Failed to reorder members" }
         }
     }
