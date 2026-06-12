@@ -236,6 +236,12 @@ class SettingsViewModel @Inject constructor(
                 }
             }
             _uiState.update { it.copy(isSaving = false) }
+            snackbarController.showSuccess(
+                when (role) {
+                    DeviceRole.TABLET -> "Switched to Tablet (Primary) · sync server started"
+                    DeviceRole.PHONE -> "Switched to Phone (Secondary) · sync client started"
+                },
+            )
         }
     }
 

@@ -97,6 +97,7 @@ class GoldPurchasesViewModel @Inject constructor(
     private val revertUseCase: RevertGoldPurchaseUseCase,
     private val markSoldUseCase: MarkGoldSoldToSupplierUseCase,
     private val sessionManager: SessionManager,
+    private val snackbarController: com.ykfj.inventory.ui.components.SnackbarController,
 ) : ViewModel() {
 
     private val dateSdf = SimpleDateFormat("MMM d, yyyy", Locale.US)
@@ -233,6 +234,12 @@ class GoldPurchasesViewModel @Inject constructor(
             if (failures > 0) {
                 _bulkError.value = "Failed to mark $failures item(s) sold"
             }
+            val succeeded = targets.size - failures
+            if (succeeded > 0) {
+                snackbarController.showSuccess(
+                    "$succeeded item${if (succeeded == 1) "" else "s"} marked sold to supplier",
+                )
+            }
         }
     }
 
@@ -243,7 +250,8 @@ class GoldPurchasesViewModel @Inject constructor(
             when (val result = revertUseCase(
                 RevertGoldPurchaseUseCase.Params(recordId, reason, userId),
             )) {
-                RevertGoldPurchaseUseCase.Result.Success -> Unit
+                RevertGoldPurchaseUseCase.Result.Success ->
+                    snackbarController.showSuccess("Gold purchase deleted")
                 RevertGoldPurchaseUseCase.Result.NotFound ->
                     _deleteError.value = "Purchase not found"
                 RevertGoldPurchaseUseCase.Result.IsTradeIn ->

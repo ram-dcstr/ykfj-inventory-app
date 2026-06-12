@@ -47,6 +47,7 @@ class AnalyticsViewModel @Inject constructor(
     getGoldTradingSummary: GetGoldTradingSummaryUseCase,
     private val exportSales: ExportSalesUseCase,
     private val sessionManager: SessionManager,
+    private val snackbarController: com.ykfj.inventory.ui.components.SnackbarController,
 ) : ViewModel() {
 
     private val _selectedDayMillis = MutableStateFlow(todayStartMillis())
@@ -130,8 +131,10 @@ class AnalyticsViewModel @Inject constructor(
         viewModelScope.launch {
             _exportState.update { ExportState(isExporting = true) }
             when (val result = exportSales(ExportSalesUseCase.Params(start, end, userId))) {
-                is ExportSalesUseCase.Result.Success ->
+                is ExportSalesUseCase.Result.Success -> {
                     _exportState.update { ExportState(uri = result.uri) }
+                    snackbarController.showSuccess("Sales CSV exported · open from Downloads")
+                }
                 is ExportSalesUseCase.Result.Error ->
                     _exportState.update { ExportState(error = result.message) }
             }

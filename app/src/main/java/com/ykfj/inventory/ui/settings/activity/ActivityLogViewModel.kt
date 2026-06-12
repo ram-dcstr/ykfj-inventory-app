@@ -55,6 +55,7 @@ class ActivityLogViewModel @Inject constructor(
     private val exportLogs: ExportActivityLogUseCase,
     private val sessionManager: SessionManager,
     userRepository: UserRepository,
+    private val snackbarController: com.ykfj.inventory.ui.components.SnackbarController,
 ) : ViewModel() {
 
     private val _filter = MutableStateFlow(ActivityLogFilter())
@@ -134,13 +135,11 @@ class ActivityLogViewModel @Inject constructor(
         _ui.update { it.copy(isWorking = true, infoMessage = null, errorMessage = null) }
         viewModelScope.launch {
             when (val r = exportLogs(f.startMillis, f.endMillis, f.userId)) {
-                is ExportActivityLogUseCase.Result.Success ->
-                    _ui.update {
-                        it.copy(
-                            isWorking = false,
-                            infoMessage = "Exported ${r.rowCount} rows → ${r.fileName}",
-                        )
-                    }
+                is ExportActivityLogUseCase.Result.Success -> {
+                    val msg = "Exported ${r.rowCount} rows → ${r.fileName}"
+                    _ui.update { it.copy(isWorking = false, infoMessage = msg) }
+                    snackbarController.showSuccess(msg)
+                }
                 ExportActivityLogUseCase.Result.NoRecords ->
                     _ui.update {
                         it.copy(isWorking = false, errorMessage = "No log entries in that range")
