@@ -9,8 +9,8 @@ import androidx.room.PrimaryKey
  * A slot in a paluwagan group. One customer may own multiple slots within
  * the same group — each is a separate row with a distinct [position].
  *
- * [position] is 1-based collection order and may be swapped mid-cycle by
- * admin/manager via `SwapPaluwaganPositionsUseCase`.
+ * [position] is 1-based collection order and may be reordered mid-cycle by
+ * admin/manager via `ReorderPaluwaganSlotsUseCase`.
  */
 @Entity(
     tableName = "paluwagan_slots",

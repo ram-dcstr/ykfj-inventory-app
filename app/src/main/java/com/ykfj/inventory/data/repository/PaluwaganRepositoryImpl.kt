@@ -77,22 +77,6 @@ class PaluwaganRepositoryImpl @Inject constructor(
         syncEnqueuer.enqueuePaluwaganSlot(entity, SyncAction.INSERT)
     }
 
-    override suspend fun swapPositions(slotIdA: String, slotIdB: String) {
-        val now = System.currentTimeMillis()
-        // Atomic: read both slots and write both new positions in one transaction so a
-        // crash or concurrent swap can't leave the two rows with duplicate/orphan positions.
-        val swapped = db.withTransaction {
-            val a = slotDao.getById(slotIdA) ?: return@withTransaction null
-            val b = slotDao.getById(slotIdB) ?: return@withTransaction null
-            slotDao.updatePosition(slotIdA, b.position, now)
-            slotDao.updatePosition(slotIdB, a.position, now)
-            a to b
-        } ?: return
-        val (a, b) = swapped
-        syncEnqueuer.enqueuePaluwaganSlot(a.copy(position = b.position, updated_at = now))
-        syncEnqueuer.enqueuePaluwaganSlot(b.copy(position = a.position, updated_at = now))
-    }
-
     override suspend fun recordPayment(payment: PaluwaganPayment) {
         val entity = payment.toEntity()
         paymentDao.insert(entity)

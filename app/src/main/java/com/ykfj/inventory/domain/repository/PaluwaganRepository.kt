@@ -55,9 +55,6 @@ interface PaluwaganRepository {
 
     suspend fun addSlot(slot: PaluwaganSlot)
 
-    /** Atomic swap of two slots' positions. */
-    suspend fun swapPositions(slotIdA: String, slotIdB: String)
-
     suspend fun recordPayment(payment: PaluwaganPayment)
 
     /** Moves `current_round` forward, seeds UNPAID payment rows for each slot. */
