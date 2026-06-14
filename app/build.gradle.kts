@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,6 +8,14 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+}
+
+// Release signing is loaded from app/keystore.properties (gitignored). On a fresh
+// clone or CI where that file is absent, release builds are left unsigned rather
+// than failing — so the project still builds anywhere.
+val keystorePropsFile = file("keystore.properties")
+val keystoreProps = Properties().apply {
+    if (keystorePropsFile.exists()) FileInputStream(keystorePropsFile).use { load(it) }
 }
 
 android {
@@ -28,6 +39,20 @@ android {
         }
     }
 
+    signingConfigs {
+        // The permanent release key — created only when keystore.properties exists
+        // (see top of file). Same key for every build so app updates install over
+        // the previous version without an uninstall.
+        if (keystoreProps.isNotEmpty()) {
+            create("release") {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             isMinifyEnabled = false
@@ -37,6 +62,11 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            // Sign with the permanent release key when available; otherwise the APK
+            // is left unsigned and must be signed manually before it can install.
+            if (keystoreProps.isNotEmpty()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
