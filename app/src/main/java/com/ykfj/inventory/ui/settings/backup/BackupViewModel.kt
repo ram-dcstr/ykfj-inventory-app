@@ -55,13 +55,18 @@ class BackupViewModel @Inject constructor(
         _state.update { it.copy(infoMessage = null, errorMessage = null) }
     }
 
-    fun runManualBackup() {
+    /**
+     * @param password non-blank → produces an AES-encrypted `.ykfjbackup`;
+     *                 blank/null → a legacy plaintext `.zip`.
+     */
+    fun runManualBackup(password: String? = null) {
         if (_state.value.isWorking) return
         _state.update { it.copy(isWorking = true, infoMessage = null, errorMessage = null) }
         viewModelScope.launch {
-            when (val r = backupManager.createManualBackup()) {
+            when (val r = backupManager.createManualBackup(password)) {
                 is BackupManager.CreateResult.Success -> {
-                    val msg = "Backup saved to Downloads · ${r.displayName}"
+                    val encryptedNote = if (!password.isNullOrBlank()) " (encrypted)" else ""
+                    val msg = "Backup saved to Downloads$encryptedNote · ${r.displayName}"
                     _state.update {
                         it.copy(
                             isWorking = false,
@@ -79,7 +84,8 @@ class BackupViewModel @Inject constructor(
         }
     }
 
-    fun restoreFromUri(uri: Uri) {
+    /** @param password required for encrypted `.ykfjbackup` archives; ignored for plaintext zips. */
+    fun restoreFromUri(uri: Uri, password: String? = null) {
         if (_state.value.isWorking) return
         _state.update { it.copy(isWorking = true, infoMessage = null, errorMessage = null) }
         viewModelScope.launch {
@@ -93,7 +99,7 @@ class BackupViewModel @Inject constructor(
                 }
                 return@launch
             }
-            when (val r = backupManager.restoreFromZip(uri)) {
+            when (val r = backupManager.restoreFromZip(uri, password)) {
                 BackupManager.RestoreResult.Success -> {
                     _state.update {
                         it.copy(
@@ -104,8 +110,22 @@ class BackupViewModel @Inject constructor(
                     }
                     snackbarController.showSuccess("Restore complete · restart the app to load the new data")
                 }
+                BackupManager.RestoreResult.PasswordRequired ->
+                    _state.update {
+                        it.copy(
+                            isWorking = false,
+                            errorMessage = "This backup is encrypted — enter its password to restore.",
+                        )
+                    }
                 is BackupManager.RestoreResult.InvalidArchive ->
                     _state.update { it.copy(isWorking = false, errorMessage = r.message) }
+                is BackupManager.RestoreResult.IncompatibleSchema ->
+                    _state.update {
+                        it.copy(
+                            isWorking = false,
+                            errorMessage = "Backup is from schema v${r.archiveVersion} but this app is at v${r.currentVersion}. Update the app to a newer version before restoring.",
+                        )
+                    }
                 is BackupManager.RestoreResult.Failed ->
                     _state.update {
                         it.copy(isWorking = false, errorMessage = "Restore failed: ${r.message}")

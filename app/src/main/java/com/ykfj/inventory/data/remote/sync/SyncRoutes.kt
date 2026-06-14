@@ -28,6 +28,7 @@ fun Route.syncRoutes(db: YkfjDatabase, deviceId: String) {
                     layaway_records = db.layawayRecordDao().getChangedSince(since).map { it.toSyncDto() },
                     layaway_transactions = db.layawayTransactionDao().getChangedSince(since).map { it.toSyncDto() },
                     damaged_records = db.damagedRecordDao().getChangedSince(since).map { it.toSyncDto() },
+                    stock_adjustments = db.stockAdjustmentDao().getChangedSince(since).map { it.toSyncDto() },
                     metal_rates = db.metalRateDao().getChangedSince(since).map { it.toSyncDto() },
                     categories = db.categoryDao().getChangedSince(since).map { it.toSyncDto() },
                     suppliers = db.supplierDao().getChangedSince(since).map { it.toSyncDto() },
@@ -147,6 +148,13 @@ fun Route.syncRoutes(db: YkfjDatabase, deviceId: String) {
                 val existing = db.damagedRecordDao().getById(dto.damaged_id)
                 if (existing == null) runCatching { db.damagedRecordDao().insert(dto.toEntity()) }
                 else if (dto.updated_at > existing.updated_at) db.damagedRecordDao().update(dto.toEntity())
+            }
+
+            // Stock adjustments
+            for (dto in payload.stock_adjustments) {
+                val existing = db.stockAdjustmentDao().getById(dto.adjustment_id)
+                if (existing == null) runCatching { db.stockAdjustmentDao().insert(dto.toEntity()) }
+                else if (dto.updated_at > existing.updated_at) db.stockAdjustmentDao().update(dto.toEntity())
             }
 
             // Paluwagan groups

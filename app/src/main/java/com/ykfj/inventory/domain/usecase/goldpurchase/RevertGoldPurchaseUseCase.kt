@@ -1,7 +1,9 @@
 package com.ykfj.inventory.domain.usecase.goldpurchase
 
 import com.ykfj.inventory.data.local.db.enums.ActivityAction
+import com.ykfj.inventory.data.local.db.enums.UserRole
 import com.ykfj.inventory.domain.repository.GoldPurchaseRepository
+import com.ykfj.inventory.domain.repository.UserRepository
 import com.ykfj.inventory.domain.usecase.activitylog.LogActivityUseCase
 import javax.inject.Inject
 
@@ -11,9 +13,12 @@ import javax.inject.Inject
  * Trade-in records ([GoldPurchaseRecord.linkedSoldRecordId] ≠ null) cannot be
  * reverted independently — the full trade-in revert is handled atomically in
  * Phase 10 to keep both sides consistent.
+ *
+ * Role enforced in code here, not just at the UI.
  */
 class RevertGoldPurchaseUseCase @Inject constructor(
     private val goldPurchaseRepository: GoldPurchaseRepository,
+    private val userRepository: UserRepository,
     private val logActivity: LogActivityUseCase,
 ) {
 
@@ -27,10 +32,17 @@ class RevertGoldPurchaseUseCase @Inject constructor(
         object Success : Result()
         object NotFound : Result()
         object IsTradeIn : Result()
+        /** Actor's role is neither ADMIN nor MANAGER. */
+        object NotAuthorized : Result()
         data class Error(val message: String) : Result()
     }
 
     suspend operator fun invoke(params: Params): Result {
+        val actor = userRepository.getById(params.actorUserId)
+        if (actor == null || (actor.role != UserRole.ADMIN && actor.role != UserRole.MANAGER)) {
+            return Result.NotAuthorized
+        }
+
         val record = goldPurchaseRepository.getById(params.recordId)
             ?: return Result.NotFound
         if (record.linkedSoldRecordId != null) return Result.IsTradeIn

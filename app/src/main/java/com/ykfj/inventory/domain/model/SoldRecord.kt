@@ -23,6 +23,8 @@ data class SoldRecord(
     val soldDate: Long,
     val notes: String?,
     val paymentMethod: PaymentMethod = PaymentMethod.CASH,
+    /** Originating layaway id when this sale came from a layaway completion; null otherwise. */
+    val linkedLayawayId: String? = null,
     val isArchived: Boolean,
     val createdAt: Long,
     val updatedAt: Long,

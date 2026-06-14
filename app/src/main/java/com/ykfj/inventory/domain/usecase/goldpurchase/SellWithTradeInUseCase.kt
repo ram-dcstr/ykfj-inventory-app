@@ -5,13 +5,17 @@ import com.ykfj.inventory.data.local.db.YkfjDatabase
 import com.ykfj.inventory.data.local.db.enums.ActivityAction
 import com.ykfj.inventory.data.local.db.enums.DiscountType
 import com.ykfj.inventory.data.local.db.enums.PaymentMethod
+import com.ykfj.inventory.data.local.db.enums.UserRole
 import com.ykfj.inventory.domain.model.GoldPurchaseItem
 import com.ykfj.inventory.domain.model.GoldPurchaseRecord
 import com.ykfj.inventory.domain.model.SoldRecord
 import com.ykfj.inventory.domain.repository.GoldPurchaseRepository
 import com.ykfj.inventory.domain.repository.ProductRepository
 import com.ykfj.inventory.domain.repository.SoldRecordRepository
+import com.ykfj.inventory.domain.repository.UserRepository
 import com.ykfj.inventory.domain.usecase.activitylog.LogActivityUseCase
+import com.ykfj.inventory.domain.usecase.common.DiscountCap
+import com.ykfj.inventory.util.CurrencyFormatter
 import java.util.UUID
 import javax.inject.Inject
 
@@ -38,6 +42,7 @@ class SellWithTradeInUseCase @Inject constructor(
     private val soldRecordRepository: SoldRecordRepository,
     private val goldPurchaseRepository: GoldPurchaseRepository,
     private val productRepository: ProductRepository,
+    private val userRepository: UserRepository,
     private val logActivity: LogActivityUseCase,
 ) {
 
@@ -64,6 +69,10 @@ class SellWithTradeInUseCase @Inject constructor(
         object InsufficientQuantity : Result()
         object NoItems : Result()
         object InvalidItem : Result()
+        /** Staff tried to apply a non-zero discount. Admin/Manager only. */
+        object DiscountNotAuthorized : Result()
+        /** Discount exceeds 20% of profit. */
+        data class DiscountExceedsCap(val maxAllowed: Double) : Result()
     }
 
     suspend operator fun invoke(params: Params): Result {
@@ -72,6 +81,22 @@ class SellWithTradeInUseCase @Inject constructor(
 
         val product = productRepository.getById(params.productId) ?: return Result.ProductNotFound
         if (params.quantity > product.quantity) return Result.InsufficientQuantity
+
+        // Same discount-cap rule as MarkAsSoldUseCase. Trade-in is just a sale
+        // paid partly in scrap — the discount must still be ≤ 20% of profit,
+        // and Staff still can't discount.
+        if (params.discountAmount > 0.0) {
+            val actor = userRepository.getById(params.actorUserId)
+            if (actor == null ||
+                (actor.role != UserRole.ADMIN && actor.role != UserRole.MANAGER)
+            ) {
+                return Result.DiscountNotAuthorized
+            }
+            val maxDiscount = DiscountCap.maxPerUnit(params.soldPrice, params.capitalPrice)
+            if (params.discountAmount > maxDiscount + DiscountCap.EPSILON) {
+                return Result.DiscountExceedsCap(maxDiscount)
+            }
+        }
 
         val now = System.currentTimeMillis()
         val soldId = UUID.randomUUID().toString()
@@ -137,21 +162,21 @@ class SellWithTradeInUseCase @Inject constructor(
         val saleAmount = params.soldPrice * params.quantity
         val net = saleAmount - totalPaid
         val netDescription = when {
-            net > 0 -> "customer paid ₱${"%.2f".format(net)} difference"
-            net < 0 -> "shop paid ₱${"%.2f".format(-net)} difference"
+            net > 0 -> "customer paid ${CurrencyFormatter.format(net)} difference"
+            net < 0 -> "shop paid ${CurrencyFormatter.format(-net)} difference"
             else -> "even swap"
         }
         logActivity(
             userId = params.actorUserId,
             action = ActivityAction.SELL,
-            description = "Trade-in sale: ${params.quantity}x ${params.productId} for ₱${"%.2f".format(saleAmount)} against ${items.size} scrap item(s) worth ₱${"%.2f".format(totalPaid)} ($netDescription)",
+            description = "Trade-in sale: ${params.quantity}x ${params.productId} for ${CurrencyFormatter.format(saleAmount)} against ${items.size} scrap item(s) worth ${CurrencyFormatter.format(totalPaid)} ($netDescription)",
             entityType = "sold_record",
             entityId = soldId,
         )
         logActivity(
             userId = params.actorUserId,
             action = ActivityAction.GOLD_PURCHASED,
-            description = "Trade-in purchase recorded — ${items.size} item(s), total ₱${"%.2f".format(totalPaid)} (linked to sale $soldId)",
+            description = "Trade-in purchase recorded — ${items.size} item(s), total ${CurrencyFormatter.format(totalPaid)} (linked to sale $soldId)",
             entityType = "gold_purchase_record",
             entityId = purchaseId,
         )

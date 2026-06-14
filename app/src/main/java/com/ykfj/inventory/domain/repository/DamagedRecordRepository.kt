@@ -17,6 +17,9 @@ interface DamagedRecordRepository {
     /** Most recent non-deleted damaged record for a product — used by revert. */
     suspend fun getMostRecentForProduct(productId: String): DamagedRecord?
 
+    /** Count of non-deleted damaged records referencing [productId]. Used by the delete-product guard. */
+    suspend fun countActiveForProduct(productId: String): Int
+
     suspend fun insert(record: DamagedRecord)
 
     suspend fun update(record: DamagedRecord)

@@ -19,6 +19,15 @@ enum class PaymentMethod(val label: String) {
     OTHER("Other"),
 }
 
+/** Reason a unit left stock outside of a sale / layaway / damage. */
+enum class StockAdjustmentReason(val label: String) {
+    LOST("Lost"),
+    STOLEN("Stolen"),
+    MISCOUNT("Miscount correction"),
+    SUPPLIER_RETURN("Returned to supplier"),
+    OTHER("Other"),
+}
+
 enum class PaluwaganGroupStatus { ACTIVE, COMPLETED }
 
 enum class PaluwaganPaymentStatus { PAID, UNPAID, LATE, PREPAID }

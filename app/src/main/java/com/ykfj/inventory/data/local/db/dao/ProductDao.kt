@@ -85,20 +85,25 @@ abstract class ProductDao {
     @Query("SELECT * FROM products WHERE product_id = :productId AND is_deleted = 0")
     abstract fun observeById(productId: String): Flow<ProductEntity?>
 
-    /** Used by [ProductIdGenerator] to find the next sequence number. */
+    /**
+     * Highest sequence number already used by any product ID sharing [prefix]
+     * (e.g. "PYX-18KSG-NCK-"). [com.ykfj.inventory.util.ProductIdGenerator] adds 1 to
+     * this to mint the next ID. Scoping by the literal ID prefix — rather than by the
+     * raw name/rate/category — guarantees uniqueness even when several different names
+     * abbreviate to the same prefix (e.g. "piyao" and "payao" both → "PYX").
+     *
+     * Intentionally does NOT filter `is_deleted = 0`: soft-deleted rows still occupy
+     * their sequence slots, so a delete-then-add won't reuse a number and collide on
+     * the UNIQUE primary key. Returns null when no product uses the prefix yet.
+     */
     @Query(
         """
-        SELECT COUNT(*) FROM products
-        WHERE name = :name
-          AND (metal_rate_id IS :metalRateId OR metal_rate_id = :metalRateId)
-          AND category_id = :categoryId
+        SELECT MAX(CAST(SUBSTR(product_id, LENGTH(:prefix) + 1) AS INTEGER))
+        FROM products
+        WHERE product_id LIKE :prefix || '%'
         """,
     )
-    abstract suspend fun countByIdComponents(
-        name: String,
-        metalRateId: String?,
-        categoryId: String,
-    ): Int
+    abstract suspend fun maxSequenceForPrefix(prefix: String): Int?
 
     @Query("SELECT COUNT(*) FROM products WHERE category_id = :categoryId AND is_deleted = 0")
     abstract suspend fun countByCategory(categoryId: String): Int

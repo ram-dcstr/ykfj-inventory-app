@@ -43,6 +43,14 @@ data class SoldRecordEntity(
     val notes: String? = null,
     @ColumnInfo(defaultValue = "CASH")
     val payment_method: PaymentMethod = PaymentMethod.CASH,
+    /**
+     * Set when this sale was auto-created by completing a layaway — points at
+     * the originating `layaway_records.layaway_id`. Lets the revert flow find
+     * and cancel the linked layaway without parsing the notes string.
+     * Null for ordinary direct sales.
+     */
+    @ColumnInfo(defaultValue = "NULL")
+    val linked_layaway_id: String? = null,
     val is_archived: Boolean = false,
     val created_at: Long,
     val updated_at: Long,

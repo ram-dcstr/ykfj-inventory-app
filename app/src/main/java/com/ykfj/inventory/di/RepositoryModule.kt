@@ -9,6 +9,7 @@ import com.ykfj.inventory.data.repository.ActivityLogRepositoryImpl
 import com.ykfj.inventory.data.repository.CategoryRepositoryImpl
 import com.ykfj.inventory.data.repository.CustomerRepositoryImpl
 import com.ykfj.inventory.data.repository.DamagedRecordRepositoryImpl
+import com.ykfj.inventory.data.repository.StockAdjustmentRepositoryImpl
 import com.ykfj.inventory.data.repository.LayawayRepositoryImpl
 import com.ykfj.inventory.data.repository.MetalRateRepositoryImpl
 import com.ykfj.inventory.data.repository.ProductImageRepositoryImpl
@@ -25,6 +26,7 @@ import com.ykfj.inventory.domain.repository.ActivityLogRepository
 import com.ykfj.inventory.domain.repository.CategoryRepository
 import com.ykfj.inventory.domain.repository.CustomerRepository
 import com.ykfj.inventory.domain.repository.DamagedRecordRepository
+import com.ykfj.inventory.domain.repository.StockAdjustmentRepository
 import com.ykfj.inventory.domain.repository.LayawayRepository
 import com.ykfj.inventory.domain.repository.MetalRateRepository
 import com.ykfj.inventory.domain.repository.ProductImageRepository
@@ -77,6 +79,9 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindDamagedRecordRepository(impl: DamagedRecordRepositoryImpl): DamagedRecordRepository
+
+    @Binds
+    abstract fun bindStockAdjustmentRepository(impl: StockAdjustmentRepositoryImpl): StockAdjustmentRepository
 
     @Binds
     abstract fun bindLayawayRepository(impl: LayawayRepositoryImpl): LayawayRepository

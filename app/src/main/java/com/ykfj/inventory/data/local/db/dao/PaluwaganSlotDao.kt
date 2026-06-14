@@ -72,11 +72,12 @@ interface PaluwaganSlotDao {
 
     @Query(
         """
-        UPDATE paluwagan_slots SET pot_collected_at = :date, updated_at = :now
+        UPDATE paluwagan_slots
+        SET pot_collected_at = :date, pot_payout_channel = :payoutChannel, updated_at = :now
         WHERE slot_id = :slotId
         """,
     )
-    suspend fun updatePotCollectedAt(slotId: String, date: Long, now: Long)
+    suspend fun updatePotCollectedAt(slotId: String, date: Long, payoutChannel: String?, now: Long)
 
     @Query("DELETE FROM paluwagan_slots WHERE group_id = :groupId")
     suspend fun hardDeleteByGroup(groupId: String)

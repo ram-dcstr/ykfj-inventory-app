@@ -256,6 +256,8 @@ class GoldPurchasesViewModel @Inject constructor(
                     _deleteError.value = "Purchase not found"
                 RevertGoldPurchaseUseCase.Result.IsTradeIn ->
                     _deleteError.value = "Trade-in purchases must be reverted from the trade-in screen"
+                RevertGoldPurchaseUseCase.Result.NotAuthorized ->
+                    _deleteError.value = "Only an admin or manager can delete a gold purchase"
                 is RevertGoldPurchaseUseCase.Result.Error ->
                     _deleteError.value = result.message
             }

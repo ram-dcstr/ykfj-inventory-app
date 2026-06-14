@@ -55,7 +55,10 @@ class CompleteLayawayUseCase @Inject constructor(
             discountAmount = 0.0,
             discountType = DiscountType.NONE,
             soldDate = now,
+            // Keep the notes marker for backward-compat with rows created before
+            // linked_layaway_id existed; new reverts read the column directly.
             notes = "layaway_complete:${params.layawayId}",
+            linkedLayawayId = params.layawayId,
             isArchived = false,
             createdAt = now,
             updatedAt = now,

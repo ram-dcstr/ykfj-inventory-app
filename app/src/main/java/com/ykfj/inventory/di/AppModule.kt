@@ -24,6 +24,7 @@ import com.ykfj.inventory.data.local.db.dao.PendingSyncDao
 import com.ykfj.inventory.data.local.db.dao.ProductDao
 import com.ykfj.inventory.data.local.db.dao.ProductImageDao
 import com.ykfj.inventory.data.local.db.dao.SoldRecordDao
+import com.ykfj.inventory.data.local.db.dao.StockAdjustmentDao
 import com.ykfj.inventory.data.local.db.dao.SupplierDao
 import com.ykfj.inventory.data.local.db.dao.UserDao
 import dagger.Module
@@ -119,4 +120,7 @@ object AppModule {
 
     @Provides
     fun provideCashMovementDao(db: YkfjDatabase): CashMovementDao = db.cashMovementDao()
+
+    @Provides
+    fun provideStockAdjustmentDao(db: YkfjDatabase): StockAdjustmentDao = db.stockAdjustmentDao()
 }

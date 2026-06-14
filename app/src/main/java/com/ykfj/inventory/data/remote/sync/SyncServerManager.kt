@@ -1,5 +1,6 @@
 package com.ykfj.inventory.data.remote.sync
 
+import android.util.Base64
 import android.util.Log
 import com.ykfj.inventory.data.local.db.YkfjDatabase
 import com.ykfj.inventory.data.local.db.entity.AppSettingsEntity
@@ -10,6 +11,7 @@ import io.ktor.server.netty.Netty
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.security.SecureRandom
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,6 +21,7 @@ class SyncServerManager @Inject constructor(
     private val db: YkfjDatabase,
     private val imageStorageManager: ImageStorageManager,
     private val nsdRegistrar: NsdRegistrar,
+    private val secretStore: KeystoreSecretStore,
 ) {
     private var engine: ApplicationEngine? = null
 
@@ -61,10 +64,42 @@ class SyncServerManager @Inject constructor(
         Log.i(TAG, "Sync server stopped")
     }
 
+    /**
+     * Returns the JWT signing secret, kept Keystore-wrapped at rest.
+     *
+     * Three code paths:
+     *  1. Encrypted value present → decrypt and return (the steady state).
+     *  2. Legacy plaintext value present (older installs) → wrap it, write the
+     *     ciphertext to `KEY_JWT_SECRET_ENC`, delete the plaintext row, return.
+     *     This is the one-time migration; idempotent on re-runs.
+     *  3. Nothing present (fresh install) → generate 256 bits of secure random,
+     *     wrap it, persist the ciphertext.
+     *
+     * If decryption fails (corrupt ciphertext, Keystore key wiped by clear-data),
+     * we fall through to (3) so the server can still come up; phones holding
+     * old tokens will have to re-login.
+     */
     private suspend fun getOrCreateJwtSecret(): String {
-        return db.appSettingsDao().getValue(KEY_JWT_SECRET) ?: UUID.randomUUID().toString().also {
-            db.appSettingsDao().upsert(AppSettingsEntity(key = KEY_JWT_SECRET, value = it))
+        val dao = db.appSettingsDao()
+        dao.getValue(KEY_JWT_SECRET_ENC)?.let { encoded ->
+            runCatching { secretStore.decrypt(encoded) }
+                .onSuccess { return it }
+                .onFailure {
+                    Log.w(TAG, "Stored JWT secret could not be decrypted — regenerating", it)
+                }
         }
+        dao.getValue(KEY_JWT_SECRET_LEGACY)?.let { legacy ->
+            val wrapped = secretStore.encrypt(legacy)
+            dao.upsert(AppSettingsEntity(key = KEY_JWT_SECRET_ENC, value = wrapped))
+            dao.delete(KEY_JWT_SECRET_LEGACY)
+            Log.i(TAG, "Migrated JWT secret from plaintext to Keystore-wrapped storage")
+            return legacy
+        }
+        val freshBytes = ByteArray(SECRET_BYTE_LENGTH).also { SecureRandom().nextBytes(it) }
+        val secret = Base64.encodeToString(freshBytes, Base64.NO_WRAP or Base64.URL_SAFE)
+        val wrapped = secretStore.encrypt(secret)
+        dao.upsert(AppSettingsEntity(key = KEY_JWT_SECRET_ENC, value = wrapped))
+        return secret
     }
 
     private suspend fun getOrCreateDeviceId(): String {
@@ -75,8 +110,13 @@ class SyncServerManager @Inject constructor(
 
     companion object {
         const val SERVER_PORT = 8080
-        private const val KEY_JWT_SECRET = "jwt_secret"
+        /** Key for the Keystore-wrapped JWT signing secret. */
+        private const val KEY_JWT_SECRET_ENC = "jwt_secret_enc"
+        /** Old key — read once during migration, then deleted. */
+        private const val KEY_JWT_SECRET_LEGACY = "jwt_secret"
         private const val KEY_DEVICE_ID = "device_id"
+        /** 32 bytes = 256-bit secret for HMAC-SHA256. */
+        private const val SECRET_BYTE_LENGTH = 32
         private const val TAG = "SyncServerManager"
     }
 }

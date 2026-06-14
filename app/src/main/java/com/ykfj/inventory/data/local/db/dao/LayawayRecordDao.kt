@@ -82,7 +82,12 @@ interface LayawayRecordDao {
     )
     suspend fun getActiveForProduct(productId: String): LayawayRecordEntity?
 
-    @Query("SELECT * FROM layaway_records WHERE layaway_id = :layawayId")
+    /**
+     * Live record for a detail screen. Filters [is_deleted] so that a soft-delete
+     * arriving via sync flips the screen to a "not found" state — without this,
+     * the UI would silently keep showing a deleted record.
+     */
+    @Query("SELECT * FROM layaway_records WHERE layaway_id = :layawayId AND is_deleted = 0")
     fun observeById(layawayId: String): Flow<LayawayRecordEntity?>
 
     @Query(

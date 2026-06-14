@@ -1,5 +1,6 @@
 package com.ykfj.inventory.data.remote.sync
 
+import android.util.Log
 import com.ykfj.inventory.data.local.db.YkfjDatabase
 import com.ykfj.inventory.data.local.image.ImageStorageManager
 import io.ktor.http.HttpStatusCode
@@ -47,9 +48,13 @@ fun Application.configureSyncServer(
 
     install(StatusPages) {
         exception<Throwable> { call, cause ->
+            // Log the full detail server-side for debugging, but return a
+            // generic body so we don't leak schema / SQL / file-path info to
+            // an attacker who can reach the LAN port.
+            Log.e("SyncServer", "Unhandled exception on ${call.request.local.uri}", cause)
             call.respond(
                 HttpStatusCode.InternalServerError,
-                mapOf("error" to (cause.message ?: "Internal server error")),
+                mapOf("error" to "Internal server error"),
             )
         }
         status(HttpStatusCode.NotFound) { call, _ ->
@@ -57,9 +62,13 @@ fun Application.configureSyncServer(
         }
     }
 
+    // One throttle per server lifecycle. Cleared when sync server restarts —
+    // we don't persist DOS state across reboots.
+    val loginThrottle = LoginThrottle()
+
     routing {
         // Public: login
-        authRoutes(db.userDao(), jwtConfig)
+        authRoutes(db.userDao(), jwtConfig, loginThrottle)
 
         // Protected: everything else requires JWT
         authenticate("jwt-auth") {

@@ -1,5 +1,6 @@
 package com.ykfj.inventory.data.repository
 
+import android.database.sqlite.SQLiteConstraintException
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
@@ -58,6 +59,17 @@ class ProductRepositoryImpl @Inject constructor(
         } else {
             productDao.update(entity)
             syncEnqueuer.enqueueProduct(entity, SyncAction.UPDATE)
+        }
+    }
+
+    override suspend fun tryAddNew(product: Product): Boolean {
+        val entity = product.toEntity()
+        return try {
+            productDao.insert(entity) // ABORTs on UNIQUE collision → throws
+            syncEnqueuer.enqueueProduct(entity, SyncAction.INSERT)
+            true
+        } catch (_: SQLiteConstraintException) {
+            false
         }
     }
 

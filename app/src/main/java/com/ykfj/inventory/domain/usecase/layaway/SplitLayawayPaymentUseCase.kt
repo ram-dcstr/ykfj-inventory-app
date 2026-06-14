@@ -9,6 +9,7 @@ import com.ykfj.inventory.domain.repository.CustomerRepository
 import com.ykfj.inventory.domain.repository.LayawayRepository
 import com.ykfj.inventory.domain.repository.ProductRepository
 import com.ykfj.inventory.domain.usecase.activitylog.LogActivityUseCase
+import com.ykfj.inventory.util.CurrencyFormatter
 import java.util.UUID
 import javax.inject.Inject
 
@@ -86,7 +87,7 @@ class SplitLayawayPaymentUseCase @Inject constructor(
         logActivity(
             userId = params.actorUserId,
             action = ActivityAction.PAYMENT,
-            description = "Split payment ₱${"%.2f".format(totalSplit)} across ${params.allocations.size} layaways",
+            description = "Split payment ${CurrencyFormatter.format(totalSplit)} across ${params.allocations.size} layaways",
             entityType = "layaway_record",
         )
         Result.Success

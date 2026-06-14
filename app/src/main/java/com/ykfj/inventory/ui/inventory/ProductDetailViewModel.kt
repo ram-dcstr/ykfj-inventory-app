@@ -7,6 +7,7 @@ import com.ykfj.inventory.data.local.db.enums.DiscountType
 import com.ykfj.inventory.data.local.db.enums.PaymentMethod
 import com.ykfj.inventory.data.local.db.enums.PricingType
 import com.ykfj.inventory.data.local.db.enums.ProductStatus
+import com.ykfj.inventory.data.local.db.enums.StockAdjustmentReason
 import com.ykfj.inventory.data.local.db.enums.UserRole
 import com.ykfj.inventory.domain.model.Category
 import com.ykfj.inventory.domain.model.Customer
@@ -25,6 +26,8 @@ import com.ykfj.inventory.domain.usecase.category.GetCategoriesUseCase
 import com.ykfj.inventory.domain.usecase.goldpurchase.AddGoldPurchaseUseCase
 import com.ykfj.inventory.domain.usecase.goldpurchase.SellWithTradeInUseCase
 import com.ykfj.inventory.domain.usecase.metalrate.GetMetalRatesUseCase
+import com.ykfj.inventory.domain.usecase.product.AdjustStockUseCase
+import com.ykfj.inventory.domain.usecase.product.DeleteProductUseCase
 import com.ykfj.inventory.domain.usecase.product.MarkAsDamagedUseCase
 import com.ykfj.inventory.domain.usecase.layaway.AddLayawayPaymentUseCase
 import com.ykfj.inventory.domain.usecase.product.MarkAsLayawayUseCase
@@ -45,7 +48,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class StatusDialog { NONE, SELL, LAYAWAY, DAMAGED, REVERT }
+enum class StatusDialog { NONE, SELL, LAYAWAY, DAMAGED, REVERT, DELETE, ADJUST_STOCK }
 
 data class ProductDetailUiState(
     val product: Product? = null,
@@ -63,6 +66,8 @@ data class ProductDetailUiState(
     val isAdminOrManager: Boolean = false,
     val canEdit: Boolean = false,
     val canRevert: Boolean = false,
+    /** Admin-only: delete affordance. The reference guard runs in the use case. */
+    val canDelete: Boolean = false,
     val activeDialog: StatusDialog = StatusDialog.NONE,
     val actionError: String? = null,
     /** Active (non-reverted) damaged records for this product, newest first. */
@@ -90,6 +95,8 @@ class ProductDetailViewModel @Inject constructor(
     private val addLayawayPayment: AddLayawayPaymentUseCase,
     private val markAsDamaged: MarkAsDamagedUseCase,
     private val revertStatus: RevertStatusUseCase,
+    private val deleteProductUseCase: DeleteProductUseCase,
+    private val adjustStock: AdjustStockUseCase,
     private val sessionManager: SessionManager,
     private val snackbarController: SnackbarController,
 ) : ViewModel() {
@@ -100,6 +107,14 @@ class ProductDetailViewModel @Inject constructor(
     private val _actionError = MutableStateFlow<String?>(null)
     private val _pickedCustomer = MutableStateFlow<Customer?>(null)
     val pickedCustomer: StateFlow<Customer?> = _pickedCustomer.asStateFlow()
+
+    /**
+     * Flips to true after a successful Sell / Layaway / Damaged / Delete so the screen
+     * returns to the inventory list. (Revert intentionally stays on the detail so the
+     * user can see the product restored to Available.)
+     */
+    private val _navigateBack = MutableStateFlow(false)
+    val navigateBack: StateFlow<Boolean> = _navigateBack.asStateFlow()
 
     val uiState: StateFlow<ProductDetailUiState> = combine(
         productRepository.observeById(productId),
@@ -170,6 +185,7 @@ class ProductDetailViewModel @Inject constructor(
             isAdminOrManager = isAdminOrManager,
             canEdit = isAdmin,
             canRevert = isAdminOrManager && (product.status == ProductStatus.SOLD || product.status == ProductStatus.DAMAGED),
+            canDelete = isAdmin,
             activeDialog = dialog,
             actionError = actionError,
             damagedRecords = damagedRecords,
@@ -226,9 +242,14 @@ class ProductDetailViewModel @Inject constructor(
                             "Sale of ${CurrencyFormatter.format(soldPrice * quantity)} recorded",
                         )
                         dismissDialog()
+                        _navigateBack.value = true
                     }
                     MarkAsSoldUseCase.Result.ProductNotFound -> _actionError.value = "Product not found"
                     MarkAsSoldUseCase.Result.InsufficientQuantity -> _actionError.value = "Not enough units available"
+                    MarkAsSoldUseCase.Result.DiscountNotAuthorized ->
+                        _actionError.value = "Only an admin or manager can apply a discount"
+                    is MarkAsSoldUseCase.Result.DiscountExceedsCap ->
+                        _actionError.value = "Discount exceeds the 20% cap (max ${CurrencyFormatter.format(result.maxAllowed)} per unit)"
                 }
             } else {
                 // Trade-in path — sale + gold purchase atomically.
@@ -272,11 +293,16 @@ class ProductDetailViewModel @Inject constructor(
                         }
                         snackbarController.showSuccess(summary)
                         dismissDialog()
+                        _navigateBack.value = true
                     }
                     SellWithTradeInUseCase.Result.ProductNotFound -> _actionError.value = "Product not found"
                     SellWithTradeInUseCase.Result.InsufficientQuantity -> _actionError.value = "Not enough units available"
                     SellWithTradeInUseCase.Result.NoItems -> _actionError.value = "Add at least one trade-in item"
                     SellWithTradeInUseCase.Result.InvalidItem -> _actionError.value = "Each trade-in item needs weight > 0 and rate > 0"
+                    SellWithTradeInUseCase.Result.DiscountNotAuthorized ->
+                        _actionError.value = "Only an admin or manager can apply a discount"
+                    is SellWithTradeInUseCase.Result.DiscountExceedsCap ->
+                        _actionError.value = "Discount exceeds the 20% cap (max ${CurrencyFormatter.format(result.maxAllowed)} per unit)"
                 }
             }
         }
@@ -315,9 +341,12 @@ class ProductDetailViewModel @Inject constructor(
                     }
                     snackbarController.showSuccess(msg)
                     dismissDialog()
+                    _navigateBack.value = true
                 }
                 MarkAsLayawayUseCase.Result.ProductNotFound -> _actionError.value = "Product not found"
                 MarkAsLayawayUseCase.Result.InsufficientQuantity -> _actionError.value = "Not enough units available"
+                is MarkAsLayawayUseCase.Result.ActiveLayawayExists ->
+                    _actionError.value = "This product already has an active layaway. Finish or cancel it first."
             }
         }
     }
@@ -337,9 +366,39 @@ class ProductDetailViewModel @Inject constructor(
                 is MarkAsDamagedUseCase.Result.Success -> {
                     snackbarController.showSuccess("Marked as damaged · 1 unit moved to Damaged screen")
                     dismissDialog()
+                    _navigateBack.value = true
                 }
                 MarkAsDamagedUseCase.Result.ProductNotFound -> _actionError.value = "Product not found"
                 MarkAsDamagedUseCase.Result.NoUnitsAvailable -> _actionError.value = "No units available"
+            }
+        }
+    }
+
+    fun submitStockAdjustment(quantity: Int, reason: StockAdjustmentReason, notes: String?) {
+        val userId = sessionManager.currentUser.value?.id ?: return
+        viewModelScope.launch {
+            when (val result = adjustStock(
+                AdjustStockUseCase.Params(
+                    productId = productId,
+                    actorUserId = userId,
+                    quantity = quantity,
+                    reason = reason,
+                    notes = notes,
+                ),
+            )) {
+                AdjustStockUseCase.Result.Success -> {
+                    snackbarController.showSuccess(
+                        "Wrote off $quantity unit${if (quantity == 1) "" else "s"} · ${reason.label}",
+                    )
+                    dismissDialog()
+                    _navigateBack.value = true
+                }
+                AdjustStockUseCase.Result.ProductNotFound -> _actionError.value = "Product not found"
+                AdjustStockUseCase.Result.NotAuthorized ->
+                    _actionError.value = "Only an admin can adjust stock"
+                AdjustStockUseCase.Result.InvalidQuantity -> _actionError.value = "Enter a valid quantity"
+                is AdjustStockUseCase.Result.InsufficientStock ->
+                    _actionError.value = "Only ${result.available} unit${if (result.available == 1) "" else "s"} in stock"
             }
         }
     }
@@ -357,6 +416,43 @@ class ProductDetailViewModel @Inject constructor(
                 RevertStatusUseCase.Result.ProductNotFound -> _actionError.value = "Product not found"
                 RevertStatusUseCase.Result.NoRecordToRevert -> _actionError.value = "No record to revert"
                 is RevertStatusUseCase.Result.Error -> _actionError.value = result.message
+            }
+        }
+    }
+
+    fun deleteProduct() {
+        val userId = sessionManager.currentUser.value?.id ?: return
+        viewModelScope.launch {
+            val result = deleteProductUseCase(
+                DeleteProductUseCase.Params(productId = productId, actorUserId = userId),
+            )
+            when (result) {
+                DeleteProductUseCase.Result.Success -> {
+                    dismissDialog()
+                    snackbarController.showSuccess("Product deleted")
+                    _navigateBack.value = true
+                }
+                DeleteProductUseCase.Result.NotFound -> {
+                    dismissDialog()
+                    _actionError.value = "Product not found"
+                }
+                DeleteProductUseCase.Result.NotAuthorized -> {
+                    dismissDialog()
+                    _actionError.value = "Only an admin can delete products"
+                }
+                is DeleteProductUseCase.Result.HasReferences -> {
+                    dismissDialog()
+                    _actionError.value = buildString {
+                        append("Cannot delete — revert its records first (")
+                        val parts = buildList {
+                            if (result.soldCount > 0) add("${result.soldCount} sold")
+                            if (result.layawayCount > 0) add("${result.layawayCount} layaway")
+                            if (result.damagedCount > 0) add("${result.damagedCount} damaged")
+                        }
+                        append(parts.joinToString(", "))
+                        append(").")
+                    }
+                }
             }
         }
     }

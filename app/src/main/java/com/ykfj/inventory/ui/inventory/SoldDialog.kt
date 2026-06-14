@@ -42,6 +42,7 @@ import com.ykfj.inventory.domain.model.Customer
 import com.ykfj.inventory.ui.components.PaymentMethodPicker
 import com.ykfj.inventory.ui.customers.CustomerAutoSuggest
 import com.ykfj.inventory.ui.goldpurchase.GoldPurchaseItemDraft
+import com.ykfj.inventory.ui.goldpurchase.GoldPurchaseItemDraftListSaver
 import com.ykfj.inventory.util.CurrencyFormatter
 
 /**
@@ -84,7 +85,11 @@ fun SoldDialog(
     var selectedPaymentMethod by rememberSaveable { mutableStateOf(PaymentMethod.CASH) }
     var notes by rememberSaveable { mutableStateOf("") }
     var tradeInEnabled by rememberSaveable { mutableStateOf(false) }
-    var tradeInItems by remember { mutableStateOf(listOf(GoldPurchaseItemDraft())) }
+    // rememberSaveable so trade-in items survive rotation / process death while
+    // the dialog is open. Without this the user loses every row they added.
+    var tradeInItems by rememberSaveable(stateSaver = GoldPurchaseItemDraftListSaver) {
+        mutableStateOf(listOf(GoldPurchaseItemDraft()))
+    }
 
     val qty = qtyText.toIntOrNull() ?: 0
     val qtyError = qty < 1 || qty > availableQty

@@ -27,16 +27,19 @@ import javax.inject.Inject
 /**
  * Phase 11 "Daily Cash" — owner's end-of-day reconciliation view.
  *
- * Combines four flows for the selected calendar day:
+ * Combines flows for the selected calendar day:
  *  - [CashMovementRepository.observeForDay] → change float, purchase float, expenses, adjustments
  *  - Sold records summed by payment method (one query per method)
  *  - Layaway transactions summed by payment method (one query per method)
+ *  - Paluwagan contributions summed by channel (cash in)
  *  - Gold purchase records summed by date (cash going out)
  *
  * Cash balance = changeFloat + purchaseFloat + cashSales + cashLayawayPayments
- *              − goldPurchasesTotal − expenses + adjustments.
+ *              + cashPaluwaganContributions − goldPurchasesTotal
+ *              − expenses + adjustments.
  *
- * Total collected = cash balance + non-cash sales + non-cash layaway payments.
+ * Total collected = cash balance + non-cash sales + non-cash layaway payments
+ *                 + non-cash paluwagan contributions.
  *
  * The change-float row is auto-created from [AppSettingKeys.DEFAULT_CHANGE_FLOAT]
  * the first time a new day is opened so the owner doesn't have to set it daily.
@@ -68,6 +71,10 @@ class DailyCashViewModel @Inject constructor(
                 db.layawayTransactionDao().observeSumByPaymentMethodForDay(PaymentMethod.GCASH.name, dayStart, dayEnd),
                 db.layawayTransactionDao().observeSumByPaymentMethodForDay(PaymentMethod.ONLINE_BANKING.name, dayStart, dayEnd),
                 db.layawayTransactionDao().observeSumByPaymentMethodForDay(PaymentMethod.OTHER.name, dayStart, dayEnd),
+                db.paluwaganPaymentDao().observeContributionSumByChannelForDay(PaymentMethod.CASH.name, dayStart, dayEnd),
+                db.paluwaganPaymentDao().observeContributionSumByChannelForDay(PaymentMethod.GCASH.name, dayStart, dayEnd),
+                db.paluwaganPaymentDao().observeContributionSumByChannelForDay(PaymentMethod.ONLINE_BANKING.name, dayStart, dayEnd),
+                db.paluwaganPaymentDao().observeContributionSumByChannelForDay(PaymentMethod.OTHER.name, dayStart, dayEnd),
                 db.goldPurchaseRecordDao().observeSumForDay(dayStart, dayEnd),
                 sessionManager.currentUser,
             ) { args: Array<Any?> ->
@@ -81,8 +88,12 @@ class DailyCashViewModel @Inject constructor(
                 val gcashLayaway = args[6] as Double
                 val onlineBankingLayaway = args[7] as Double
                 val otherLayaway = args[8] as Double
-                val goldPurchasesTotal = args[9] as Double
-                val user = args[10] as com.ykfj.inventory.domain.model.User?
+                val cashPaluwagan = args[9] as Double
+                val gcashPaluwagan = args[10] as Double
+                val onlineBankingPaluwagan = args[11] as Double
+                val otherPaluwagan = args[12] as Double
+                val goldPurchasesTotal = args[13] as Double
+                val user = args[14] as com.ykfj.inventory.domain.model.User?
 
                 buildState(
                     dayStart = dayStart,
@@ -95,6 +106,10 @@ class DailyCashViewModel @Inject constructor(
                     gcashLayaway = gcashLayaway,
                     onlineBankingLayaway = onlineBankingLayaway,
                     otherLayaway = otherLayaway,
+                    cashPaluwagan = cashPaluwagan,
+                    gcashPaluwagan = gcashPaluwagan,
+                    onlineBankingPaluwagan = onlineBankingPaluwagan,
+                    otherPaluwagan = otherPaluwagan,
                     goldPurchasesTotal = goldPurchasesTotal,
                     role = user?.role,
                 )
@@ -242,6 +257,10 @@ class DailyCashViewModel @Inject constructor(
         gcashLayaway: Double,
         onlineBankingLayaway: Double,
         otherLayaway: Double,
+        cashPaluwagan: Double,
+        gcashPaluwagan: Double,
+        onlineBankingPaluwagan: Double,
+        otherPaluwagan: Double,
         goldPurchasesTotal: Double,
         role: UserRole?,
     ): DailyCashUiState {
@@ -252,12 +271,12 @@ class DailyCashViewModel @Inject constructor(
         val expensesSum = expenses.sumOf { it.amount }       // negative
         val adjustmentsSum = adjustments.sumOf { it.amount } // signed
 
-        val cashBalance = changeFloat + purchaseFloat + cashSales + cashLayaway -
+        val cashBalance = changeFloat + purchaseFloat + cashSales + cashLayaway + cashPaluwagan -
             goldPurchasesTotal + expensesSum + adjustmentsSum
 
-        val gcashBalance = gcashSales + gcashLayaway
-        val onlineBankingBalance = onlineBankingSales + onlineBankingLayaway
-        val otherBalance = otherSales + otherLayaway
+        val gcashBalance = gcashSales + gcashLayaway + gcashPaluwagan
+        val onlineBankingBalance = onlineBankingSales + onlineBankingLayaway + onlineBankingPaluwagan
+        val otherBalance = otherSales + otherLayaway + otherPaluwagan
 
         return DailyCashUiState(
             selectedDay = dayStart,
@@ -271,6 +290,10 @@ class DailyCashViewModel @Inject constructor(
             gcashLayawayPayments = gcashLayaway,
             onlineBankingLayawayPayments = onlineBankingLayaway,
             otherLayawayPayments = otherLayaway,
+            cashPaluwaganContributions = cashPaluwagan,
+            gcashPaluwaganContributions = gcashPaluwagan,
+            onlineBankingPaluwaganContributions = onlineBankingPaluwagan,
+            otherPaluwaganContributions = otherPaluwagan,
             goldPurchasesTotal = goldPurchasesTotal,
             expenses = expenses,
             adjustments = adjustments,

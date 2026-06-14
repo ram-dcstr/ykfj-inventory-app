@@ -271,11 +271,11 @@ class PaluwaganDetailViewModel @Inject constructor(
         }
     }
 
-    /** Records the actual date the collector received the pot money. */
-    fun recordPotCollection(slotId: String, date: Long) {
+    /** Records the actual date and channel through which the collector received the pot money. */
+    fun recordPotCollection(slotId: String, date: Long, payoutChannel: PaymentMethod?) {
         viewModelScope.launch {
             runCatching {
-                paluwaganRepository.recordPotCollection(slotId, date)
+                paluwaganRepository.recordPotCollection(slotId, date, payoutChannel)
             }.onSuccess {
                 snackbarController.showSuccess("Pot collection recorded")
             }.onFailure { _error.value = it.message ?: "Failed to record pot collection" }

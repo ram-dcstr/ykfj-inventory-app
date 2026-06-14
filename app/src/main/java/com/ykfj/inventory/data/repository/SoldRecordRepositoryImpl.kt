@@ -31,6 +31,9 @@ class SoldRecordRepositoryImpl @Inject constructor(
     override suspend fun getMostRecentForProduct(productId: String): SoldRecord? =
         soldRecordDao.getMostRecentForProduct(productId)?.toDomain()
 
+    override suspend fun countActiveForProduct(productId: String): Int =
+        soldRecordDao.countActiveForProduct(productId)
+
     override suspend fun findByLayawayCompletion(layawayId: String): SoldRecord? =
         soldRecordDao.findByNotes("layaway_complete:$layawayId")?.toDomain()
 

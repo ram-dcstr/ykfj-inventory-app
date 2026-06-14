@@ -24,6 +24,7 @@ import com.ykfj.inventory.data.local.db.dao.PendingSyncDao
 import com.ykfj.inventory.data.local.db.dao.ProductDao
 import com.ykfj.inventory.data.local.db.dao.ProductImageDao
 import com.ykfj.inventory.data.local.db.dao.SoldRecordDao
+import com.ykfj.inventory.data.local.db.dao.StockAdjustmentDao
 import com.ykfj.inventory.data.local.db.dao.SupplierDao
 import com.ykfj.inventory.data.local.db.dao.UserDao
 import com.ykfj.inventory.data.local.db.entity.ActivityLogEntity
@@ -45,6 +46,7 @@ import com.ykfj.inventory.data.local.db.entity.ProductEntity
 import com.ykfj.inventory.data.local.db.entity.ProductFts
 import com.ykfj.inventory.data.local.db.entity.ProductImageEntity
 import com.ykfj.inventory.data.local.db.entity.SoldRecordEntity
+import com.ykfj.inventory.data.local.db.entity.StockAdjustmentEntity
 import com.ykfj.inventory.data.local.db.entity.SupplierEntity
 import com.ykfj.inventory.data.local.db.entity.UserEntity
 
@@ -79,8 +81,9 @@ import com.ykfj.inventory.data.local.db.entity.UserEntity
         GoldPurchaseRecordEntity::class,
         GoldPurchaseItemEntity::class,
         CashMovementEntity::class,
+        StockAdjustmentEntity::class,
     ],
-    version = 8,
+    version = 11,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 2, to = 3),
@@ -88,6 +91,12 @@ import com.ykfj.inventory.data.local.db.entity.UserEntity
         AutoMigration(from = 5, to = 6),
         AutoMigration(from = 6, to = 7),
         AutoMigration(from = 7, to = 8),
+        // 8→9: adds nullable sold_records.linked_layaway_id (defaults NULL).
+        AutoMigration(from = 8, to = 9),
+        // 9→10: adds nullable paluwagan_slots.pot_payout_channel (defaults NULL).
+        AutoMigration(from = 9, to = 10),
+        // 10→11: adds the stock_adjustments table.
+        AutoMigration(from = 10, to = 11),
     ],
 )
 @TypeConverters(Converters::class)
@@ -114,8 +123,18 @@ abstract class YkfjDatabase : RoomDatabase() {
     abstract fun goldPurchaseRecordDao(): GoldPurchaseRecordDao
     abstract fun goldPurchaseItemDao(): GoldPurchaseItemDao
     abstract fun cashMovementDao(): CashMovementDao
+    abstract fun stockAdjustmentDao(): StockAdjustmentDao
 
     companion object {
         const val DATABASE_NAME = "ykfj.db"
+
+        /**
+         * Mirror of the schema version in the @Database annotation above. Used by
+         * [com.ykfj.inventory.data.local.backup.BackupManager] to write into the
+         * backup manifest and reject restores from a newer schema (which we can't
+         * downgrade to). Keep this in sync with the annotation's `version = N`
+         * line above when you bump the schema.
+         */
+        const val SCHEMA_VERSION = 11
     }
 }

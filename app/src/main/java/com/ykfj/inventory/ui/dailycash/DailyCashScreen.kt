@@ -33,6 +33,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,6 +57,10 @@ fun DailyCashScreen(viewModel: DailyCashViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val selectedDay by viewModel.selectedDay.collectAsStateWithLifecycle()
     val dateLabelSdf = remember { SimpleDateFormat("EEEE, MMM d, yyyy", Locale.US) }
+
+    // Each time the screen is opened, snap the date filter back to today — a
+    // previously-browsed day shouldn't linger after navigating away and back.
+    LaunchedEffect(Unit) { viewModel.today() }
 
     var showEditChangeFloat by rememberSaveable { mutableStateOf(false) }
     var showEditPurchaseFloat by rememberSaveable { mutableStateOf(false) }
@@ -116,6 +121,7 @@ fun DailyCashScreen(viewModel: DailyCashViewModel = hiltViewModel()) {
             )
             AmountRow("Cash sales", state.cashSales)
             AmountRow("Cash layaway payments", state.cashLayawayPayments)
+            AmountRow("Paluwagan contributions", state.cashPaluwaganContributions)
             AmountRow(
                 label = "Gold purchases (out)",
                 amount = -state.goldPurchasesTotal,
@@ -174,6 +180,7 @@ fun DailyCashScreen(viewModel: DailyCashViewModel = hiltViewModel()) {
         SectionCard(title = "GCash") {
             AmountRow("GCash sales", state.gcashSales)
             AmountRow("GCash layaway payments", state.gcashLayawayPayments)
+            AmountRow("Paluwagan contributions", state.gcashPaluwaganContributions)
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             BalanceRow("GCash balance", state.gcashBalance, big = true)
         }
@@ -182,15 +189,19 @@ fun DailyCashScreen(viewModel: DailyCashViewModel = hiltViewModel()) {
         SectionCard(title = "Online Banking") {
             AmountRow("Online Banking sales", state.onlineBankingSales)
             AmountRow("Online Banking layaway payments", state.onlineBankingLayawayPayments)
+            AmountRow("Paluwagan contributions", state.onlineBankingPaluwaganContributions)
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             BalanceRow("Online Banking balance", state.onlineBankingBalance, big = true)
         }
 
         // ── Other (only shown if there's activity, keeps day view tight) ───
-        if (state.otherSales != 0.0 || state.otherLayawayPayments != 0.0) {
+        if (state.otherSales != 0.0 || state.otherLayawayPayments != 0.0 ||
+            state.otherPaluwaganContributions != 0.0
+        ) {
             SectionCard(title = "Other payment methods") {
                 AmountRow("Other sales", state.otherSales)
                 AmountRow("Other layaway payments", state.otherLayawayPayments)
+                AmountRow("Paluwagan contributions", state.otherPaluwaganContributions)
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                 BalanceRow("Other balance", state.otherBalance, big = true)
             }

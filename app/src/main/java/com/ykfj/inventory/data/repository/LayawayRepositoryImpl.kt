@@ -1,5 +1,7 @@
 package com.ykfj.inventory.data.repository
 
+import androidx.room.withTransaction
+import com.ykfj.inventory.data.local.db.YkfjDatabase
 import com.ykfj.inventory.data.local.db.dao.LayawayRecordDao
 import com.ykfj.inventory.data.local.db.dao.LayawayTransactionDao
 import com.ykfj.inventory.data.local.db.enums.LayawayStatus
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 class LayawayRepositoryImpl @Inject constructor(
+    private val db: YkfjDatabase,
     private val layawayRecordDao: LayawayRecordDao,
     private val layawayTransactionDao: LayawayTransactionDao,
     private val syncEnqueuer: SyncEnqueuer,
@@ -22,6 +25,9 @@ class LayawayRepositoryImpl @Inject constructor(
 
     override fun observeActive(): Flow<List<LayawayRecord>> =
         layawayRecordDao.observeActive().map { it.map { e -> e.toDomain() } }
+
+    override fun observeOverdueCount(now: Long): Flow<Int> =
+        layawayRecordDao.observeOverdueCount(now)
 
     override fun observeCompleted(): Flow<List<LayawayRecord>> =
         layawayRecordDao.observeCompleted().map { it.map { e -> e.toDomain() } }
@@ -38,6 +44,9 @@ class LayawayRepositoryImpl @Inject constructor(
     override suspend fun getActiveForProduct(productId: String): LayawayRecord? =
         layawayRecordDao.getActiveForProduct(productId)?.toDomain()
 
+    override suspend fun countActiveForProduct(productId: String): Int =
+        layawayRecordDao.countActiveForProduct(productId)
+
     override suspend fun insert(record: LayawayRecord) {
         val entity = record.toEntity()
         layawayRecordDao.insert(entity)
@@ -52,31 +61,34 @@ class LayawayRepositoryImpl @Inject constructor(
 
     override suspend fun addPayment(transaction: LayawayTransaction) {
         val txEntity = transaction.toEntity()
-        layawayTransactionDao.insert(txEntity)
-        syncEnqueuer.enqueueLayawayTransaction(txEntity, SyncAction.INSERT)
-
         val now = System.currentTimeMillis()
-        val newTotal = layawayTransactionDao.sumForLayaway(transaction.layawayId)
-        layawayRecordDao.updateTotalPaid(transaction.layawayId, newTotal, now)
-        layawayRecordDao.getById(transaction.layawayId)?.let {
-            syncEnqueuer.enqueueLayawayRecord(it)
+        // Atomic: insert the txn row AND update the layaway's total_paid together.
+        // If either step fails, neither commits and total_paid stays consistent.
+        val updatedRecord = db.withTransaction {
+            layawayTransactionDao.insert(txEntity)
+            val newTotal = layawayTransactionDao.sumForLayaway(transaction.layawayId)
+            layawayRecordDao.updateTotalPaid(transaction.layawayId, newTotal, now)
+            layawayRecordDao.getById(transaction.layawayId)
         }
+        syncEnqueuer.enqueueLayawayTransaction(txEntity, SyncAction.INSERT)
+        updatedRecord?.let { syncEnqueuer.enqueueLayawayRecord(it) }
     }
 
     override suspend fun deletePayment(transactionId: String) {
         val txn = layawayTransactionDao.getById(transactionId) ?: return
         val now = System.currentTimeMillis()
-        layawayTransactionDao.softDelete(transactionId, now)
+        // Atomic: soft-delete the txn AND recompute total_paid together.
+        val updatedRecord = db.withTransaction {
+            layawayTransactionDao.softDelete(transactionId, now)
+            val newTotal = layawayTransactionDao.sumForLayaway(txn.layaway_id)
+            layawayRecordDao.updateTotalPaid(txn.layaway_id, newTotal, now)
+            layawayRecordDao.getById(txn.layaway_id)
+        }
         syncEnqueuer.enqueueLayawayTransaction(
             txn.copy(is_deleted = true, updated_at = now),
             SyncAction.DELETE,
         )
-
-        val newTotal = layawayTransactionDao.sumForLayaway(txn.layaway_id)
-        layawayRecordDao.updateTotalPaid(txn.layaway_id, newTotal, now)
-        layawayRecordDao.getById(txn.layaway_id)?.let {
-            syncEnqueuer.enqueueLayawayRecord(it)
-        }
+        updatedRecord?.let { syncEnqueuer.enqueueLayawayRecord(it) }
     }
 
     override suspend fun markCompleted(id: String, completionDate: Long) {

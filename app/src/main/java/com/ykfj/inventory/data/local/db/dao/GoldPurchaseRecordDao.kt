@@ -39,9 +39,20 @@ interface GoldPurchaseRecordDao {
     )
     fun observeBetween(startMillis: Long, endMillis: Long): Flow<List<GoldPurchaseRecordEntity>>
 
-    @Query("SELECT * FROM gold_purchase_records WHERE id = :id LIMIT 1")
+    /**
+     * Live record for a detail screen. Filters [is_deleted] so a soft-delete
+     * arriving via sync flips the screen to a "not found" state.
+     */
+    @Query("SELECT * FROM gold_purchase_records WHERE id = :id AND is_deleted = 0 LIMIT 1")
     fun observeById(id: String): Flow<GoldPurchaseRecordEntity?>
 
+    /**
+     * One-shot fetch. Intentionally does NOT filter [is_deleted] because the
+     * sync merge path needs to see soft-deleted local rows so it can apply
+     * incoming UPDATEs (including the DELETE-flagging UPDATE) on top of them.
+     * Repo callers that hit this for fetch-before-mutate are operating on
+     * not-yet-deleted rows, so the lack of filter is harmless for them.
+     */
     @Query("SELECT * FROM gold_purchase_records WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): GoldPurchaseRecordEntity?
 

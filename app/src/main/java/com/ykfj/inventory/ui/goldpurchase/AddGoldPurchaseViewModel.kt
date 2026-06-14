@@ -38,6 +38,47 @@ data class GoldPurchaseItemDraft(
     val isValid: Boolean get() = description.isNotBlank() && (finalValue ?: 0.0) > 0
 }
 
+/**
+ * Saver for `List<GoldPurchaseItemDraft>` — lets dialogs hold trade-in item state
+ * across configuration changes (rotation, dark-mode flip) via `rememberSaveable`.
+ *
+ * Each draft is flattened to its 8 constructor fields (all saveable primitives or
+ * nullable Strings); the list of N drafts becomes a flat list of 8 × N elements.
+ */
+private const val DRAFT_FIELD_COUNT = 8
+
+val GoldPurchaseItemDraftListSaver: androidx.compose.runtime.saveable.Saver<List<GoldPurchaseItemDraft>, Any> =
+    androidx.compose.runtime.saveable.listSaver(
+        save = { items ->
+            items.flatMap { d ->
+                listOf<Any?>(
+                    d.localId,
+                    d.description,
+                    d.purity,
+                    d.weightGrams,
+                    d.buyRatePerGram,
+                    d.overrideEnabled,
+                    d.overrideValue,
+                    d.photoUri,
+                )
+            }
+        },
+        restore = { flat ->
+            flat.chunked(DRAFT_FIELD_COUNT).map { fields ->
+                GoldPurchaseItemDraft(
+                    localId = fields[0] as String,
+                    description = fields[1] as String,
+                    purity = fields[2] as String?,
+                    weightGrams = fields[3] as String,
+                    buyRatePerGram = fields[4] as String,
+                    overrideEnabled = fields[5] as Boolean,
+                    overrideValue = fields[6] as String,
+                    photoUri = fields[7] as String?,
+                )
+            }
+        },
+    )
+
 data class AddGoldPurchaseUiState(
     val customer: Customer? = null,
     val items: List<GoldPurchaseItemDraft> = listOf(GoldPurchaseItemDraft()),

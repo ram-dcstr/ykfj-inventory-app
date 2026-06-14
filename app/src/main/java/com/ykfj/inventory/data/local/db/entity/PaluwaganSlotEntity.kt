@@ -31,6 +31,12 @@ data class PaluwaganSlotEntity(
     val position: Int,
     /** The actual date the collector received the pot (epoch ms). Null until recorded. */
     val pot_collected_at: Long? = null,
+    /**
+     * How the pot was paid out (PaymentMethod.name). Null until collected, and for
+     * rows recorded before this column existed — treated as CASH downstream.
+     */
+    @ColumnInfo(name = "pot_payout_channel", defaultValue = "NULL")
+    val pot_payout_channel: String? = null,
     val created_at: Long,
     val updated_at: Long,
     val is_deleted: Boolean = false,

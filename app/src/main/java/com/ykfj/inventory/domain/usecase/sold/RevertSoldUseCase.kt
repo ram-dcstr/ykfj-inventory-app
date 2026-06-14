@@ -14,9 +14,10 @@ import javax.inject.Inject
  * quantity is reduced and kept active. If it equals the full quantity, the record
  * is soft-deleted. In both cases the product quantity is restored by [Params.quantity].
  *
- * If the sold record originated from a completed layaway (notes = "layaway_complete:{id}"),
- * the linked layaway record is also cancelled — no quantity double-adjustment since
- * the product restore above already handles it.
+ * If the sold record originated from a completed layaway, the linked layaway record is
+ * also cancelled — no quantity double-adjustment since the product restore above already
+ * handles it. The link is read from [SoldRecord.linkedLayawayId]; rows created before
+ * that column existed fall back to the legacy `notes = "layaway_complete:{id}"` marker.
  *
  * Admin / Manager only — enforce role before calling.
  */
@@ -62,9 +63,12 @@ class RevertSoldUseCase @Inject constructor(
 
         // If this sale came from a completed layaway, cancel that layaway record.
         // Quantity was already restored above — markCancelled only flips the status.
-        val layawayId = record.notes?.removePrefix("layaway_complete:")
-            ?.takeIf { record.notes.startsWith("layaway_complete:") }
-        if (layawayId != null) {
+        // Prefer the dedicated column; fall back to the legacy notes marker for
+        // rows created before linkedLayawayId existed.
+        val layawayId = record.linkedLayawayId
+            ?: record.notes?.takeIf { it.startsWith(LAYAWAY_COMPLETE_PREFIX) }
+                ?.removePrefix(LAYAWAY_COMPLETE_PREFIX)
+        if (!layawayId.isNullOrBlank()) {
             layawayRepository.markCancelled(layawayId, System.currentTimeMillis())
         }
 
@@ -81,5 +85,9 @@ class RevertSoldUseCase @Inject constructor(
     private fun buildRevertNote(reason: String, qty: Int, existing: String?): String {
         val tag = "Reverted ${qty}x: $reason"
         return if (existing.isNullOrBlank()) tag else "$existing | $tag"
+    }
+
+    private companion object {
+        const val LAYAWAY_COMPLETE_PREFIX = "layaway_complete:"
     }
 }

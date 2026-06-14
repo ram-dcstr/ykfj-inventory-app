@@ -52,6 +52,10 @@ fun AnalyticsScreen(viewModel: AnalyticsViewModel = hiltViewModel()) {
     var showDayPicker by remember { mutableStateOf(false) }
     val snackbarHost = remember { SnackbarHostState() }
 
+    // Each time the screen is opened, snap the day/month filters back to the
+    // current period — a previously-browsed date shouldn't linger on return.
+    LaunchedEffect(Unit) { viewModel.resetToToday() }
+
     // Launch share intent when export URI arrives
     LaunchedEffect(state.exportedUri) {
         state.exportedUri?.let { uri ->

@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
 import com.ykfj.inventory.data.remote.sync.SyncManager
@@ -46,6 +47,7 @@ import com.ykfj.inventory.ui.components.AppSnackbarHost
 import com.ykfj.inventory.ui.components.SnackbarController
 import com.ykfj.inventory.ui.navigation.NavGraph
 import com.ykfj.inventory.ui.navigation.Screen
+import com.ykfj.inventory.ui.navigation.SidebarBadgeViewModel
 import com.ykfj.inventory.ui.navigation.SidebarContent
 import com.ykfj.inventory.ui.theme.YkfjInventoryTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -129,6 +131,20 @@ class MainActivity : ComponentActivity() {
             sessionManager.recordActivity()
         }
     }
+
+    // App lock: single-activity app, so the Activity's stop/start track the app
+    // leaving/returning. Returning after more than the grace window requires re-login.
+    override fun onStop() {
+        super.onStop()
+        sessionManager.onAppBackgrounded()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (sessionManager.onAppForegrounded()) {
+            snackbarController.showInfo("Logged out for security — please log in")
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -155,9 +171,16 @@ private fun AppShell(
     val onScreenSelected: (Screen) -> Unit = { screen ->
         selectedScreen = screen.route
         navController.navigate(screen.route) {
-            popUpTo(Screen.Inventory.route) { saveState = true }
+            // Clear the back stack on every tab switch so each tab starts fresh —
+            // no half-finished work (search text, filters, scroll, or an open
+            // sub-screen) is restored when returning to a tab. This applies to
+            // every tab, including the Home/Inventory tab.
+            //
+            // Drilling into a detail screen within a tab uses navController.navigate(...)
+            // directly (not this handler), so back from a detail still returns to the
+            // tab's list as usual. Only switching tabs resets.
+            popUpTo(navController.graph.id) { inclusive = true }
             launchSingleTop = true
-            restoreState = true
         }
     }
 
@@ -182,9 +205,11 @@ private fun AppShell(
         }
     }
 
-    // TODO: Wire real badge counts from DAOs in Phase 2+
-    val layawayOverdueCount = 0
-    val paluwaganDueCount = 0
+    // Live red-alert badge counts. The VM ticks once a minute so the time
+    // window in the underlying SQL stays current.
+    val badgeViewModel: SidebarBadgeViewModel = hiltViewModel()
+    val layawayOverdueCount by badgeViewModel.layawayOverdueCount.collectAsStateWithLifecycle()
+    val paluwaganDueCount by badgeViewModel.paluwaganDueTodayCount.collectAsStateWithLifecycle()
 
     if (isExpandedScreen) {
         Row(modifier = Modifier.fillMaxSize()) {

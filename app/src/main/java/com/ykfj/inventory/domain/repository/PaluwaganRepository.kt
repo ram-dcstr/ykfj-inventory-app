@@ -30,6 +30,13 @@ interface PaluwaganRepository {
 
     fun observeActiveGroups(): Flow<List<PaluwaganGroup>>
 
+    /**
+     * Count of UNPAID payments whose computed due-date falls within
+     * [dayStart] .. [dayEnd]. Powers the red badge on the Paluwagan sidebar
+     * entry. Caller must pass refreshed day boundaries periodically.
+     */
+    fun observeDueTodayCount(dayStart: Long, dayEnd: Long): Flow<Int>
+
     fun observeGroup(groupId: String): Flow<PaluwaganGroup?>
 
     fun observeSlots(groupId: String): Flow<List<PaluwaganSlot>>
@@ -69,8 +76,8 @@ interface PaluwaganRepository {
     /** Pasalo: replaces the customer assigned to a slot. */
     suspend fun updateSlotCustomer(slotId: String, newCustomerId: String)
 
-    /** Records the actual date the collector physically received the pot money. */
-    suspend fun recordPotCollection(slotId: String, date: Long)
+    /** Records the date and channel through which the collector received the pot money. */
+    suspend fun recordPotCollection(slotId: String, date: Long, payoutChannel: PaymentMethod?)
 
     suspend fun getSlotsForGroup(groupId: String): List<PaluwaganSlot>
 

@@ -18,7 +18,9 @@ import javax.inject.Inject
  *  - Metal rate: leading karat prefix (e.g. "18K") + first letter of each remaining word.
  *  - Fixed-price items use "FXD" for the rate segment.
  *
- * The sequence is scoped per `name + metalRateId + categoryId` combo.
+ * The 6-digit sequence is scoped per ID **prefix** (`NAME-RATE-CAT-`), not per raw
+ * name/rate/category — so distinct names that abbreviate to the same prefix (e.g.
+ * "piyao" and "payao" both → "PYX") still receive unique, non-colliding IDs.
  */
 class ProductIdGenerator @Inject constructor(
     private val productDao: ProductDao,
@@ -27,20 +29,15 @@ class ProductIdGenerator @Inject constructor(
         name: String,
         metalRateName: String?,
         categoryName: String,
-        metalRateId: String?,
-        categoryId: String,
     ): String {
         val nameAbbr = abbreviateWord(name)
         val rateAbbr = if (metalRateName != null) abbreviateRate(metalRateName) else "FXD"
         val catAbbr = abbreviateWord(categoryName)
 
-        val count = productDao.countByIdComponents(
-            name = name.trim(),
-            metalRateId = metalRateId,
-            categoryId = categoryId,
-        )
-        val seq = (count + 1).toString().padStart(6, '0')
-        return "$nameAbbr-$rateAbbr-$catAbbr-$seq"
+        val prefix = "$nameAbbr-$rateAbbr-$catAbbr-"
+        val maxSeq = productDao.maxSequenceForPrefix(prefix) ?: 0
+        val seq = (maxSeq + 1).toString().padStart(6, '0')
+        return "$prefix$seq"
     }
 
     /**

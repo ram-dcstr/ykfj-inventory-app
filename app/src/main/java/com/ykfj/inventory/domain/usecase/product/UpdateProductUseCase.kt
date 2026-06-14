@@ -58,8 +58,6 @@ class UpdateProductUseCase @Inject constructor(
                 name = params.name.trim(),
                 metalRateName = params.metalRateName,
                 categoryName = params.categoryName,
-                metalRateId = params.metalRateId,
-                categoryId = params.categoryId,
             )
         } else {
             existing.id

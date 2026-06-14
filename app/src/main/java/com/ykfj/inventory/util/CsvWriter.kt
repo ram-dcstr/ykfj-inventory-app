@@ -16,11 +16,22 @@ import android.provider.MediaStore
  */
 object CsvWriter {
 
-    /** Properly escapes a single CSV field per RFC 4180. */
+    /** Cell-prefix characters Excel and Sheets treat as the start of a formula. */
+    private val FORMULA_PREFIXES = charArrayOf('=', '+', '-', '@', '\t', '\r')
+
+    /**
+     * Properly escapes a single CSV field per RFC 4180, plus a defence against
+     * CSV-injection (a.k.a. "formula injection"): cells beginning with `=`,
+     * `+`, `-`, `@`, `\t` or `\r` are prefixed with a single quote so spreadsheet
+     * apps treat them as literal text instead of executing them as formulas.
+     * Without this, a customer name like `=cmd|'/c calc'!A1` becomes a live
+     * formula the moment the file is opened.
+     */
     fun escape(value: String?): String {
         if (value == null) return ""
-        val needsQuoting = value.any { it == ',' || it == '"' || it == '\n' || it == '\r' }
-        val escaped = value.replace("\"", "\"\"")
+        val safe = if (value.isNotEmpty() && value[0] in FORMULA_PREFIXES) "'$value" else value
+        val needsQuoting = safe.any { it == ',' || it == '"' || it == '\n' || it == '\r' }
+        val escaped = safe.replace("\"", "\"\"")
         return if (needsQuoting) "\"$escaped\"" else escaped
     }
 

@@ -62,6 +62,10 @@ fun SoldArchiveScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     var revertTarget by remember { mutableStateOf<SoldRecordRow?>(null) }
 
+    // Each time the screen is opened, snap the date filter back to today — a
+    // previously-browsed day shouldn't linger after navigating away and back.
+    LaunchedEffect(Unit) { viewModel.resetToToday() }
+
     LaunchedEffect(state.error) {
         state.error?.let { snackbarHost.showSnackbar(it); viewModel.clearError() }
     }

@@ -14,6 +14,13 @@ interface LayawayRepository {
 
     fun observeActive(): Flow<List<LayawayRecord>>
 
+    /**
+     * Count of ACTIVE layaways whose `due_date` is strictly before [now] (overdue).
+     * Powers the red badge on the Layaway sidebar entry. Caller must pass a
+     * refreshed `now` periodically so newly-elapsed dates roll into the count.
+     */
+    fun observeOverdueCount(now: Long): Flow<Int>
+
     fun observeCompleted(): Flow<List<LayawayRecord>>
 
     fun observeForCustomer(customerId: String): Flow<List<LayawayRecord>>
@@ -24,6 +31,9 @@ interface LayawayRepository {
 
     /** Returns the single ACTIVE layaway for a product, or null if none. */
     suspend fun getActiveForProduct(productId: String): LayawayRecord?
+
+    /** Count of non-deleted ACTIVE layawnays referencing [productId]. Used by the delete-product guard. */
+    suspend fun countActiveForProduct(productId: String): Int
 
     suspend fun insert(record: LayawayRecord)
 

@@ -3,6 +3,7 @@ package com.ykfj.inventory.domain.usecase.goldpurchase
 import com.ykfj.inventory.data.local.db.enums.ActivityAction
 import com.ykfj.inventory.domain.repository.GoldPurchaseRepository
 import com.ykfj.inventory.domain.usecase.activitylog.LogActivityUseCase
+import com.ykfj.inventory.util.CurrencyFormatter
 import javax.inject.Inject
 
 /**
@@ -42,7 +43,7 @@ class MarkGoldSoldToSupplierUseCase @Inject constructor(
             logActivity(
                 userId = params.actorUserId,
                 action = ActivityAction.GOLD_SOLD_TO_SUPPLIER,
-                description = "Gold purchase item ${params.itemId} sold to supplier for ₱${"%.2f".format(params.supplierPrice)}",
+                description = "Gold purchase item ${params.itemId} sold to supplier for ${CurrencyFormatter.format(params.supplierPrice)}",
                 entityType = "gold_purchase_item",
                 entityId = params.itemId,
             )

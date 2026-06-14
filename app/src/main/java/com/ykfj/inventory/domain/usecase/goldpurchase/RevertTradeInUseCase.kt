@@ -3,9 +3,11 @@ package com.ykfj.inventory.domain.usecase.goldpurchase
 import androidx.room.withTransaction
 import com.ykfj.inventory.data.local.db.YkfjDatabase
 import com.ykfj.inventory.data.local.db.enums.ActivityAction
+import com.ykfj.inventory.data.local.db.enums.UserRole
 import com.ykfj.inventory.domain.repository.GoldPurchaseRepository
 import com.ykfj.inventory.domain.repository.ProductRepository
 import com.ykfj.inventory.domain.repository.SoldRecordRepository
+import com.ykfj.inventory.domain.repository.UserRepository
 import com.ykfj.inventory.domain.usecase.activitylog.LogActivityUseCase
 import javax.inject.Inject
 
@@ -27,13 +29,14 @@ import javax.inject.Inject
  * Activity is logged with both [ActivityAction.GOLD_PURCHASE_REVERTED] and [ActivityAction.REVERT]
  * so the audit trail shows both sides being undone.
  *
- * The caller is responsible for role gating (Admin/Manager only).
+ * Admin or Manager only — enforced in code here, not just at the UI.
  */
 class RevertTradeInUseCase @Inject constructor(
     private val db: YkfjDatabase,
     private val goldPurchaseRepository: GoldPurchaseRepository,
     private val soldRecordRepository: SoldRecordRepository,
     private val productRepository: ProductRepository,
+    private val userRepository: UserRepository,
     private val logActivity: LogActivityUseCase,
 ) {
 
@@ -47,10 +50,17 @@ class RevertTradeInUseCase @Inject constructor(
         object Success : Result()
         /** No gold purchase record with that id, or its `linkedSoldRecordId` is null, or the linked sold record doesn't exist. */
         object NotFound : Result()
+        /** Actor's role is neither ADMIN nor MANAGER. */
+        object NotAuthorized : Result()
         data class Error(val message: String) : Result()
     }
 
     suspend operator fun invoke(params: Params): Result {
+        val actor = userRepository.getById(params.actorUserId)
+        if (actor == null || (actor.role != UserRole.ADMIN && actor.role != UserRole.MANAGER)) {
+            return Result.NotAuthorized
+        }
+
         val purchase = goldPurchaseRepository.getById(params.goldPurchaseRecordId)
             ?: return Result.NotFound
         val soldId = purchase.linkedSoldRecordId ?: return Result.NotFound

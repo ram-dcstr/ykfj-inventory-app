@@ -142,6 +142,8 @@ class DamagedViewModel @Inject constructor(
                 }
                 RevertMeltUseCase.Result.RecordNotFound ->
                     _pageState.value = _pageState.value.copy(error = "Record not found")
+                RevertMeltUseCase.Result.NotAuthorized ->
+                    _pageState.value = _pageState.value.copy(error = "Only an admin can revert a melt")
             }
         }
     }

@@ -27,6 +27,17 @@ interface ProductRepository {
     suspend fun upsert(product: Product)
 
     /**
+     * Insert a brand-new product. Returns `false` if a row with the same
+     * [Product.id] already exists (UNIQUE collision), so the caller can
+     * regenerate the ID and retry. Returns `true` on successful insert.
+     *
+     * Used by [com.ykfj.inventory.domain.usecase.product.AddProductUseCase]
+     * to retry under the rare race where two devices generate the same
+     * sequence number for the same name+rate+category combo.
+     */
+    suspend fun tryAddNew(product: Product): Boolean
+
+    /**
      * Adjust available quantity by [delta] (negative to consume, positive to
      * restore). Flips [Product.status] to SOLD when the resulting quantity
      * reaches zero, back to AVAILABLE otherwise.
@@ -45,8 +56,14 @@ interface ProductRepository {
     suspend fun renameId(oldId: String, newId: String)
 
     /**
-     * Soft delete. Callers must ensure no sold/layaway/damaged records
-     * reference this product — see the deletion guard in `Inventory-Rules.md`.
+     * Low-level soft delete — **no reference guard**. Most callers should use
+     * [com.ykfj.inventory.domain.usecase.product.DeleteProductUseCase] instead,
+     * which enforces the Inventory-Rules.md rule "cannot delete if any
+     * sold/layaway/damaged records reference this product".
+     *
+     * This raw method exists only for intentional "delete with known references"
+     * paths — currently just
+     * [com.ykfj.inventory.domain.usecase.damaged.MeltDamagedProductUseCase].
      */
     suspend fun delete(id: String)
 

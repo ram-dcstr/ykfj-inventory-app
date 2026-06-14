@@ -114,6 +114,12 @@ class AnalyticsViewModel @Inject constructor(
 
     fun selectMonth(year: Int, month: Int) { _selectedMonthKey.value = Pair(year, month) }
 
+    /** Snaps the daily and monthly filters back to the current day/month. */
+    fun resetToToday() {
+        _selectedDayMillis.value = todayStartMillis()
+        _selectedMonthKey.value = Pair(currentYear(), currentMonth())
+    }
+
     fun exportDayCsv() {
         val day = _selectedDayMillis.value
         export(start = day, end = day + DAY_MILLIS - 1)

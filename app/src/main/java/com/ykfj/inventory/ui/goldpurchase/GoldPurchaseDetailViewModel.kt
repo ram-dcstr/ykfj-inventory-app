@@ -132,6 +132,8 @@ class GoldPurchaseDetailViewModel @Inject constructor(
                     _extras.value = _extras.value.copy(isReverting = false, revertError = "Purchase not found")
                 RevertGoldPurchaseUseCase.Result.IsTradeIn ->
                     _extras.value = _extras.value.copy(isReverting = false, revertError = "This is a trade-in — use Revert Trade-in")
+                RevertGoldPurchaseUseCase.Result.NotAuthorized ->
+                    _extras.value = _extras.value.copy(isReverting = false, revertError = "Only an admin or manager can revert a gold purchase")
                 is RevertGoldPurchaseUseCase.Result.Error ->
                     _extras.value = _extras.value.copy(isReverting = false, revertError = result.message)
             }
@@ -161,6 +163,8 @@ class GoldPurchaseDetailViewModel @Inject constructor(
                 }
                 RevertTradeInUseCase.Result.NotFound ->
                     _extras.value = _extras.value.copy(isReverting = false, revertError = "Trade-in record or its linked sale could not be found")
+                RevertTradeInUseCase.Result.NotAuthorized ->
+                    _extras.value = _extras.value.copy(isReverting = false, revertError = "Only an admin or manager can revert a trade-in")
                 is RevertTradeInUseCase.Result.Error ->
                     _extras.value = _extras.value.copy(isReverting = false, revertError = result.message)
             }

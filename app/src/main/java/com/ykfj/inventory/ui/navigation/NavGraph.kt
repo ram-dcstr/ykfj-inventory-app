@@ -1,5 +1,8 @@
 package com.ykfj.inventory.ui.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -15,8 +18,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.ykfj.inventory.ui.analytics.AnalyticsScreen
-import com.ykfj.inventory.ui.categories.CategoriesScreen
-import com.ykfj.inventory.ui.damaged.DamagedScreen
 import com.ykfj.inventory.ui.goldpurchase.AddGoldPurchaseModal
 import com.ykfj.inventory.ui.goldpurchase.GoldPurchaseDetailScreen
 import com.ykfj.inventory.ui.goldpurchase.GoldPurchasesScreen
@@ -37,8 +38,14 @@ import com.ykfj.inventory.ui.settings.activity.ActivityLogScreen
 import com.ykfj.inventory.ui.settings.archive.ArchiveManagerScreen
 import com.ykfj.inventory.ui.settings.backup.BackupScreen
 import com.ykfj.inventory.ui.settings.users.UserManagementScreen
+import com.ykfj.inventory.ui.setup.SetupScreen
 import com.ykfj.inventory.ui.sold.SoldArchiveScreen
-import com.ykfj.inventory.ui.suppliers.SuppliersScreen
+import com.ykfj.inventory.ui.stocklosses.StockLossesScreen
+
+// Fast fade-through for every screen/tab change. Pure alpha (no slide/scale/relayout),
+// so it's GPU-cheap and ~3× snappier than Compose Navigation's 700ms default fade.
+private const val NAV_FADE_IN_MS = 250
+private const val NAV_FADE_OUT_MS = 200
 
 @Composable
 fun NavGraph(
@@ -49,6 +56,10 @@ fun NavGraph(
         navController = navController,
         startDestination = Screen.Inventory.route,
         modifier = modifier,
+        enterTransition = { fadeIn(animationSpec = tween(NAV_FADE_IN_MS)) },
+        exitTransition = { fadeOut(animationSpec = tween(NAV_FADE_OUT_MS)) },
+        popEnterTransition = { fadeIn(animationSpec = tween(NAV_FADE_IN_MS)) },
+        popExitTransition = { fadeOut(animationSpec = tween(NAV_FADE_OUT_MS)) },
     ) {
         Screen.allScreens.forEach { screen ->
             composable(screen.route) {
@@ -58,8 +69,7 @@ fun NavGraph(
                         onNavigateToDetail = { productId -> navController.navigate("product_detail/$productId") },
                     )
                     Screen.MetalRates -> MetalRatesScreen()
-                    Screen.Categories -> CategoriesScreen()
-                    Screen.Suppliers -> SuppliersScreen()
+                    Screen.Setup -> SetupScreen()
                     Screen.Customers -> CustomersScreen(
                         onNavigateToDetail = { id ->
                             navController.navigate("customer_detail/$id")
@@ -70,7 +80,7 @@ fun NavGraph(
                         onNavigateToDetail = { id -> navController.navigate("gold_purchase_detail/$id") },
                     )
                     Screen.SoldArchive -> SoldArchiveScreen()
-                    Screen.Damaged -> DamagedScreen(
+                    Screen.StockLosses -> StockLossesScreen(
                         onNavigateToProduct = { productId ->
                             navController.navigate("product_detail_readonly/$productId")
                         },

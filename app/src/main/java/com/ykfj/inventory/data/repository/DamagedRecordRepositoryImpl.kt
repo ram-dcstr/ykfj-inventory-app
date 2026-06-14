@@ -31,6 +31,9 @@ class DamagedRecordRepositoryImpl @Inject constructor(
     override suspend fun getMostRecentForProduct(productId: String): DamagedRecord? =
         damagedRecordDao.getMostRecentForProduct(productId)?.toDomain()
 
+    override suspend fun countActiveForProduct(productId: String): Int =
+        damagedRecordDao.countActiveForProduct(productId)
+
     override suspend fun insert(record: DamagedRecord) {
         val entity = record.toEntity()
         damagedRecordDao.insert(entity)

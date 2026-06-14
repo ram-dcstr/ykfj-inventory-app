@@ -26,11 +26,25 @@ class MarkAsLayawayUseCase @Inject constructor(
         data class Success(val layawayId: String) : Result()
         object ProductNotFound : Result()
         object InsufficientQuantity : Result()
+
+        /**
+         * The product already has an ACTIVE layaway. Per Inventory-Rules.md,
+         * only one active layaway is allowed per product at a time — finish or
+         * cancel the existing one before starting a new one.
+         */
+        data class ActiveLayawayExists(val existingLayawayId: String) : Result()
     }
 
     suspend operator fun invoke(params: Params): Result {
         val product = productRepository.getById(params.productId) ?: return Result.ProductNotFound
         if (params.quantity > product.quantity) return Result.InsufficientQuantity
+
+        // Inventory-Rules.md: only one active layaway per product. Block the
+        // second one here in the use case so any caller (UI bypass, sync,
+        // future scripts) hits the same guard.
+        layawayRepository.getActiveForProduct(params.productId)?.let {
+            return Result.ActiveLayawayExists(it.id)
+        }
 
         val now = System.currentTimeMillis()
         val record = LayawayRecord(

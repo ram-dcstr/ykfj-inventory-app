@@ -19,14 +19,24 @@ import javax.inject.Inject
  * - Payment date on or after [Params.roundCollectionDate] → LATE
  *
  * If [Params.amountPaid] covers multiple rounds (≥ 2× [Params.contributionAmount]),
- * future rounds up to [Params.totalSlots] are automatically pre-paid with PREPAID status
- * using [Params.contributionAmount] each. If those round rows already exist (seeded by
- * advanceRound), they are updated in place; otherwise new rows are pre-created.
+ * the member's next unpaid rounds are filled in ascending order — earliest missed
+ * rounds first — up to [Params.totalSlots], one [Params.contributionAmount] each.
+ * Already-covered rounds are skipped. Each filled round's status is PAID/LATE if it is
+ * at or before the current group round (its collection date has arrived), or PREPAID if
+ * it is a future round. This lets a member who missed everything settle the full amount
+ * at the final round and have every prior round cleared in order.
+ *
+ * The amount is split so the row totals reconcile exactly to [Params.amountPaid]: each
+ * filled future round holds one contribution, and the main round keeps the remainder
+ * (no double counting).
  *
  * If a pre-seeded UNPAID row exists (created by [AdvancePaluwaganRoundUseCase]),
  * it is updated in place. Otherwise a new payment row is inserted.
  *
- * Credit score: +1 for PAID, −2 for LATE.
+ * Credit score: applied once per round settled in this session (main round + each
+ * seed) — +1 for an on-time PAID or ahead-of-schedule PREPAID round, −2 for a LATE
+ * one. A chronic late payer clearing several missed rounds at once is penalised per
+ * round, not just once.
  */
 class RecordPaluwaganPaymentUseCase @Inject constructor(
     private val paluwaganRepository: PaluwaganRepository,
@@ -73,10 +83,15 @@ class RecordPaluwaganPaymentUseCase @Inject constructor(
             return Result.AlreadyPaid
         }
 
-        val mainStatus = if (params.paymentDate < params.roundCollectionDate)
-            PaluwaganPaymentStatus.PAID
-        else
-            PaluwaganPaymentStatus.LATE
+        // A round paid before the group has reached it is settled ahead of schedule →
+        // PREPAID, matching the seed-round labelling below. This covers the "pay ahead"
+        // button, which records a single future round directly as the main payment.
+        // Otherwise it's PAID when settled before its own collection date, LATE after.
+        val mainStatus = when {
+            params.roundNumber > params.currentGroupRound -> PaluwaganPaymentStatus.PREPAID
+            params.paymentDate < params.roundCollectionDate -> PaluwaganPaymentStatus.PAID
+            else -> PaluwaganPaymentStatus.LATE
+        }
 
         val now = System.currentTimeMillis()
 
@@ -84,39 +99,26 @@ class RecordPaluwaganPaymentUseCase @Inject constructor(
             (params.amountPaid / params.contributionAmount).toInt().coerceAtLeast(1)
         else 1
 
-        // --- Read phase: collect all existing seed rows before any writes ---
-        val seedExistingByRound = mutableMapOf<Int, com.ykfj.inventory.domain.model.PaluwaganPayment?>()
+        // --- Read phase: collect the member's next unpaid rounds after the main round ---
+        // We fill the EARLIEST missed/open rounds first (ascending) and skip rounds
+        // already covered, so a late payer settles their first misses before paying any
+        // round ahead. This also lets someone who missed everything pay the full amount
+        // at the final round and have every prior round filled in order.
+        val seedExistingByRound = linkedMapOf<Int, com.ykfj.inventory.domain.model.PaluwaganPayment?>()
         if (roundsCovered > 1) {
-            val isCatchUp = params.roundNumber < params.currentGroupRound
-            val seedStartRound = if (isCatchUp) params.currentGroupRound else params.roundNumber + 1
-            for (i in 0 until roundsCovered - 1) {
-                val futureRound = seedStartRound + i
-                if (futureRound > params.totalSlots) break
-                seedExistingByRound[futureRound] =
-                    paluwaganRepository.getPaymentForSlotRound(params.slotId, futureRound)
+            var r = params.roundNumber + 1
+            while (r <= params.totalSlots && seedExistingByRound.size < roundsCovered - 1) {
+                val rowForRound = paluwaganRepository.getPaymentForSlotRound(params.slotId, r)
+                if (rowForRound == null || rowForRound.status == PaluwaganPaymentStatus.UNPAID) {
+                    seedExistingByRound[r] = rowForRound
+                }
+                r++
             }
         }
 
-        // --- Build write list ---
-        val upserts = mutableListOf<PaymentUpsert>()
-
-        // Main round
-        val mainPayment = PaluwaganPayment(
-            id = existing?.id ?: UUID.randomUUID().toString(),
-            groupId = params.groupId,
-            slotId = params.slotId,
-            roundNumber = params.roundNumber,
-            amountPaid = params.amountPaid,
-            paymentDate = params.paymentDate,
-            status = mainStatus,
-            notes = params.notes,
-            paymentMethod = params.paymentMethod,
-            createdAt = now,
-            updatedAt = now,
-        )
-        upserts.add(PaymentUpsert(existingPaymentId = existing?.id, payment = mainPayment))
-
-        // Seed rounds
+        // --- Build seed rounds first, so we know how many we actually create ---
+        // Each seed round holds exactly one contributionAmount.
+        val seedUpserts = mutableListOf<PaymentUpsert>()
         for ((futureRound, futureExisting) in seedExistingByRound) {
             // Skip rounds already paid/late/prepaid
             if (futureExisting != null && futureExisting.status != PaluwaganPaymentStatus.UNPAID) continue
@@ -145,14 +147,53 @@ class RecordPaluwaganPaymentUseCase @Inject constructor(
                 createdAt = now,
                 updatedAt = now,
             )
-            upserts.add(PaymentUpsert(existingPaymentId = futureExisting?.id, payment = seedPayment))
+            seedUpserts.add(PaymentUpsert(existingPaymentId = futureExisting?.id, payment = seedPayment))
         }
+
+        // The advance portion is allocated to the seed rows (one contributionAmount
+        // each). The main round keeps only the remainder, so the sum across ALL rows
+        // equals exactly amountPaid. Previously the main round stored the full
+        // amountPaid *and* each seed stored contributionAmount → the advance was
+        // counted twice, inflating the member's total beyond the group's max.
+        val seedsTotal = params.contributionAmount * seedUpserts.size
+        val mainAmount = (params.amountPaid - seedsTotal).coerceAtLeast(0.0)
+
+        // --- Build write list (main round first, then seeds) ---
+        val upserts = mutableListOf<PaymentUpsert>()
+
+        val mainPayment = PaluwaganPayment(
+            id = existing?.id ?: UUID.randomUUID().toString(),
+            groupId = params.groupId,
+            slotId = params.slotId,
+            roundNumber = params.roundNumber,
+            amountPaid = mainAmount,
+            paymentDate = params.paymentDate,
+            status = mainStatus,
+            notes = params.notes
+                ?: if (mainStatus == PaluwaganPaymentStatus.PREPAID) "Paid ahead of schedule" else null,
+            paymentMethod = params.paymentMethod,
+            createdAt = now,
+            updatedAt = now,
+        )
+        upserts.add(PaymentUpsert(existingPaymentId = existing?.id, payment = mainPayment))
+        upserts.addAll(seedUpserts)
 
         // --- Single atomic write ---
         paluwaganRepository.recordPaymentAtomic(upserts)
 
-        val creditDelta = if (mainStatus == PaluwaganPaymentStatus.PAID) 1 else -2
-        customerRepository.adjustCreditScore(params.customerId, creditDelta)
+        // Credit score moves once per round actually settled in this session — the
+        // main round plus every catch-up/advance seed. A member clearing four missed
+        // rounds in one lump takes the LATE penalty four times, not once; paying on
+        // time or ahead of schedule earns +1 per round.
+        val creditDelta = upserts.sumOf { upsert ->
+            val delta: Int = when (upsert.payment.status) {
+                PaluwaganPaymentStatus.PAID, PaluwaganPaymentStatus.PREPAID -> 1
+                PaluwaganPaymentStatus.LATE -> -2
+                else -> 0
+            }
+            delta
+        }
+        if (creditDelta != 0) customerRepository.adjustCreditScore(params.customerId, creditDelta)
 
         logActivity(
             userId = params.actorUserId,

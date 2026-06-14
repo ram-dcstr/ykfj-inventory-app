@@ -31,8 +31,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -205,7 +203,6 @@ fun PaluwaganDetailScreen(
             roundNumber = round,
             defaultAmount = state.group?.contributionAmount ?: 0.0,
             totalSlots = state.group?.totalSlots ?: 0,
-            currentGroupRound = state.group?.currentRound ?: 0,
             onConfirm = { amount, paymentDate, paymentMethod, notes ->
                 viewModel.recordPayment(
                     slotId = slot.slotId,
@@ -248,8 +245,8 @@ fun PaluwaganDetailScreen(
     collectPotSlot?.let { slot ->
         CollectPotDialog(
             slotRow = slot,
-            onConfirm = { date ->
-                viewModel.recordPotCollection(slot.slotId, date)
+            onConfirm = { date, payoutChannel ->
+                viewModel.recordPotCollection(slot.slotId, date, payoutChannel)
                 collectPotSlot = null
             },
             onDismiss = { collectPotSlot = null },
@@ -259,6 +256,7 @@ fun PaluwaganDetailScreen(
     editPaymentTarget?.let { payment ->
         EditPaymentDialog(
             payment = payment,
+            contributionAmount = state.group?.contributionAmount ?: 0.0,
             onConfirm = { amount, date, method, notes ->
                 viewModel.editPayment(payment.id, payment.roundNumber, amount, date, method, notes)
                 editPaymentTarget = null
@@ -429,6 +427,7 @@ private fun PaluwaganDetailContent(
                 MergedMemberList(
                     slots = state.slotRows,
                     currentRound = group.currentRound,
+                    totalSlots = group.totalSlots,
                     groupStartDate = group.startDate,
                     frequencyDays = group.frequencyDays,
                     canReorder = canReorder,
@@ -462,8 +461,8 @@ private fun PaluwaganDetailContent(
         // ── Completion flash ──────────────────────────────────────────────────
         AnimatedVisibility(
             visible = completing,
-            enter = fadeIn(tween(200)) + scaleIn(tween(200), initialScale = 0.88f),
-            exit = fadeOut(tween(400)),
+            enter = fadeIn(tween(250)),
+            exit = fadeOut(tween(250)),
         ) {
             Row(
                 modifier = Modifier
@@ -493,7 +492,8 @@ private fun PaluwaganDetailContent(
             visible = state.isAdminOrManager &&
                 group.status == PaluwaganGroupStatus.ACTIVE &&
                 !completing,
-            exit = fadeOut(tween(150)) + shrinkVertically(tween(200)),
+            enter = fadeIn(tween(250)),
+            exit = fadeOut(tween(200)),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 HorizontalDivider()
@@ -570,6 +570,7 @@ private fun PaluwaganDetailContent(
 private fun MergedMemberList(
     slots: List<SlotRow>,
     currentRound: Int,
+    totalSlots: Int,
     groupStartDate: Long,
     frequencyDays: Int,
     canReorder: Boolean,
@@ -653,15 +654,25 @@ private fun MergedMemberList(
             val collectDateLabel = remember(collectDateMs) { dateFmt.format(Date(collectDateMs)) }
             val isCollector = currentRound > 0 && slot.position == currentRound
             val payment = if (currentRound > 0) slot.payments[currentRound] else null
-            // Always record the earliest unpaid round first, not necessarily the current one
-            val earliestUnpaidRound = if (currentRound > 0) {
-                (1..currentRound).firstOrNull { r ->
-                    slot.payments[r]?.status == PaluwaganPaymentStatus.UNPAID
+            // Next round this member can still pay. Spans the whole group (not just up
+            // to the current round) so a member who has prepaid the current round can
+            // keep paying forward. A round is payable if it has no row yet (null) or
+            // its row is still UNPAID. The dialog caps the amount, so no overpay.
+            val nextPayableRound = if (currentRound > 0) {
+                (1..totalSlots).firstOrNull { r ->
+                    val p = slot.payments[r]
+                    p == null || p.status == PaluwaganPaymentStatus.UNPAID
                 }
             } else null
             // Recording paluwagan payments is open to all roles per business rules.
             val canRecord = groupStatus == PaluwaganGroupStatus.ACTIVE &&
-                earliestUnpaidRound != null
+                nextPayableRound != null
+            // Current round already covered but a *later* round is still open → offer
+            // a "pay ahead" button next to the status badge.
+            val currentCovered = payment?.status != null &&
+                payment.status != PaluwaganPaymentStatus.UNPAID
+            val payAhead = currentCovered &&
+                nextPayableRound != null && nextPayableRound > currentRound
 
             val customerSlots = customerSlotIds[slot.customerId] ?: emptyList()
             val slotIndex = customerSlots.indexOf(slot.slotId)
@@ -758,11 +769,26 @@ private fun MergedMemberList(
                             }
                         }
                     }
-                    // Gift button: round must have advanced past this collector AND
-                    // today must be on or after the member's scheduled collection date.
+                    // The pot for a member's collection round can only be taken once
+                    // EVERY slot has paid that round's contribution (PAID / LATE / PREPAID).
+                    // Until the pot is actually full, the collect button stays hidden — this
+                    // stops anyone from collecting right after a round starts, before any
+                    // money is in.
+                    val potRound = slot.position
+                    val potRoundFullyPaid = slots.all { s ->
+                        val st = s.payments[potRound]?.status
+                        st != null && st != PaluwaganPaymentStatus.UNPAID
+                    }
+                    // Gift button: shown from the collector's OWN round onward (<=, not <)
+                    // so the final member can be marked collected during the last round —
+                    // otherwise their pot can never be recorded and the group can't be
+                    // completed. Gated on the round (which the admin advances manually) AND
+                    // on the pot being fully funded — NOT the scheduled calendar date, so a
+                    // group can run ahead of schedule.
                     val canCollect = isAdminOrManager &&
-                        slot.position < currentRound &&
-                        System.currentTimeMillis() >= collectDateMs
+                        currentRound > 0 &&
+                        slot.position <= currentRound &&
+                        potRoundFullyPaid
                     if (canCollect) {
                         IconButton(
                             onClick = { onCollectPot(slot) },
@@ -780,7 +806,8 @@ private fun MergedMemberList(
                         PaymentBadgeOrButton(
                             status = payment?.status,
                             canRecord = canRecord,
-                            onRecord = { onRecordPayment(slot, earliestUnpaidRound ?: currentRound) },
+                            payAheadAvailable = payAhead,
+                            onRecord = { onRecordPayment(slot, nextPayableRound ?: currentRound) },
                         )
                     }
                     IconButton(onClick = { onViewHistory(slot) }, modifier = Modifier.size(32.dp)) {
@@ -821,12 +848,17 @@ private fun MergedMemberList(
                     (slot.position.toLong() * frequencyDays - 1) * 86_400_000L
                 val collectDateLabel = remember(collectDateMs) { dateFmt.format(Date(collectDateMs)) }
                 val payment = slot.payments[currentRound]
-                val earliestUnpaidRound = (1..currentRound).firstOrNull { r ->
-                    slot.payments[r]?.status == PaluwaganPaymentStatus.UNPAID
+                val nextPayableRound = (1..totalSlots).firstOrNull { r ->
+                    val p = slot.payments[r]
+                    p == null || p.status == PaluwaganPaymentStatus.UNPAID
                 }
                 val canRecord = isAdminOrManager &&
                     groupStatus == PaluwaganGroupStatus.ACTIVE &&
-                    earliestUnpaidRound != null
+                    nextPayableRound != null
+                val currentCovered = payment?.status != null &&
+                    payment.status != PaluwaganPaymentStatus.UNPAID
+                val payAhead = currentCovered &&
+                    nextPayableRound != null && nextPayableRound > currentRound
 
                 val customerSlots = customerSlotIds[slot.customerId] ?: emptyList()
                 val slotIndex = customerSlots.indexOf(slot.slotId)
@@ -915,7 +947,8 @@ private fun MergedMemberList(
                         PaymentBadgeOrButton(
                             status = payment?.status,
                             canRecord = canRecord,
-                            onRecord = { onRecordPayment(slot, earliestUnpaidRound ?: currentRound) },
+                            payAheadAvailable = payAhead,
+                            onRecord = { onRecordPayment(slot, nextPayableRound ?: currentRound) },
                         )
                         IconButton(onClick = { onViewHistory(slot) }, modifier = Modifier.size(32.dp)) {
                             Icon(Icons.Default.Info, contentDescription = "View payment history", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(15.dp))
@@ -1066,36 +1099,6 @@ private fun CurrentRoundCallout(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun PaymentBadgeOrButton(
-    status: PaluwaganPaymentStatus?,
-    canRecord: Boolean,
-    onRecord: () -> Unit,
-) {
-    when (status) {
-        PaluwaganPaymentStatus.PAID ->
-            PaymentStatusBadge("PAID", Color(0xFF1B5E20).copy(alpha = 0.12f), Color(0xFF1B5E20))
-        PaluwaganPaymentStatus.LATE ->
-            PaymentStatusBadge("LATE", Color(0xFFB71C1C).copy(alpha = 0.12f), Color(0xFFB71C1C))
-        PaluwaganPaymentStatus.PREPAID ->
-            PaymentStatusBadge("PRE-PAID", Color(0xFF1565C0).copy(alpha = 0.12f), Color(0xFF1565C0))
-        PaluwaganPaymentStatus.UNPAID ->
-            if (canRecord) {
-                IconButton(onClick = onRecord, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        Icons.Default.Payments,
-                        contentDescription = "Record payment",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-            } else {
-                PaymentStatusBadge("DUE", Color(0xFFE65100).copy(alpha = 0.12f), Color(0xFFE65100))
-            }
-        null -> Text("—", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -1257,1050 +1260,6 @@ private fun PaymentHistorySection(
 
                     if (round > 1) HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PaymentStatusBadge(label: String, background: Color, textColor: Color) {
-    Box(
-        modifier = Modifier
-            .background(background, shape = MaterialTheme.shapes.small)
-            .padding(horizontal = 8.dp, vertical = 2.dp),
-    ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.labelSmall,
-            color = textColor,
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
-}
-
-@Composable
-private fun PasaloIndicator(originalName: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
-        modifier = Modifier.padding(top = 2.dp),
-    ) {
-        Icon(
-            Icons.Default.SwapHoriz,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(11.dp),
-        )
-        Text(
-            "was $originalName",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontStyle = FontStyle.Italic,
-        )
-    }
-}
-
-@Composable
-private fun SlotBadge(label: String) {
-    Box(
-        modifier = Modifier
-            .background(Color(0xFF1565C0), shape = MaterialTheme.shapes.small)
-            .padding(horizontal = 5.dp, vertical = 1.dp),
-    ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.labelSmall,
-            color = Color.White,
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
-}
-
-@Composable
-private fun CollectedBadge() {
-    Box(
-        modifier = Modifier
-            .background(Color(0xFF1B5E20).copy(alpha = 0.12f), shape = MaterialTheme.shapes.small)
-            .padding(horizontal = 8.dp, vertical = 2.dp),
-    ) {
-        Text(
-            "✓ Collected",
-            style = MaterialTheme.typography.labelSmall,
-            color = Color(0xFF1B5E20),
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
-}
-
-@Composable
-private fun InfoRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-    }
-}
-
-// ── Dialogs ───────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun RecordPaymentDialog(
-    slotRow: SlotRow,
-    roundNumber: Int,
-    defaultAmount: Double,
-    totalSlots: Int,
-    currentGroupRound: Int,
-    onConfirm: (amount: Double, paymentDate: Long, paymentMethod: PaymentMethod?, notes: String?) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var amountRaw by rememberSaveable { mutableStateOf(defaultAmount.toString()) }
-    var paymentMethod by rememberSaveable { mutableStateOf<PaymentMethod?>(null) }
-    var channelExpanded by remember { mutableStateOf(false) }
-    var notes by rememberSaveable { mutableStateOf("") }
-    var showDatePicker by remember { mutableStateOf(false) }
-
-    val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = System.currentTimeMillis(),
-    )
-    val selectedDateMs = datePickerState.selectedDateMillis ?: System.currentTimeMillis()
-    val dateLabel = remember(selectedDateMs) {
-        SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(selectedDateMs))
-    }
-
-    // For a catch-up (past-due round): max = 1 (this round) + all rounds from current onward.
-    // For a current/advance payment: max = all rounds from this round onward.
-    val isCatchUp = roundNumber < currentGroupRound
-    val remainingRounds = if (isCatchUp)
-        1 + (totalSlots - currentGroupRound + 1).coerceAtLeast(0)
-    else
-        (totalSlots - roundNumber + 1).coerceAtLeast(1)
-    val maxAmount = if (defaultAmount > 0) defaultAmount * remainingRounds else Double.MAX_VALUE
-
-    val amount = amountRaw.toDoubleOrNull()
-    val amountExceedsMax = amount != null && defaultAmount > 0 && amount > maxAmount
-    val isValid = amount != null && amount > 0 && !amountExceedsMax
-
-    if (showDatePicker) {
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("OK") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
-            },
-        ) {
-            DatePicker(state = datePickerState)
-        }
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Record Payment") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    "Round $roundNumber — ${slotRow.customerName} (slot #${slotRow.position})",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-
-                // Amount
-                OutlinedTextField(
-                    value = amountRaw,
-                    onValueChange = { amountRaw = it },
-                    label = { Text("Amount Paid (₱)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    isError = amountExceedsMax,
-                    supportingText = if (amountExceedsMax) {
-                        {
-                            Text(
-                                "Max is ${CurrencyFormatter.format(maxAmount)} ($remainingRounds rounds remaining)",
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        }
-                    } else null,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-
-                // Advance payment hint
-                val enteredAmount = amountRaw.toDoubleOrNull() ?: 0.0
-                val roundsCovered = if (defaultAmount > 0) (enteredAmount / defaultAmount).toInt().coerceAtLeast(0) else 0
-                if (roundsCovered > 1) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .background(Color(0xFF1565C0).copy(alpha = 0.12f), shape = MaterialTheme.shapes.small)
-                                .padding(horizontal = 8.dp, vertical = 3.dp),
-                        ) {
-                            Text(
-                                "Covers $roundsCovered rounds",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color(0xFF1565C0),
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
-                        Text(
-                            "Rounds ${roundNumber + 1}–${roundNumber + roundsCovered - 1} will be PRE-PAID",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-
-                // Payment date
-                OutlinedTextField(
-                    value = dateLabel,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Payment Date") },
-                    trailingIcon = {
-                        IconButton(onClick = { showDatePicker = true }) {
-                            Icon(Icons.Default.CalendarToday, contentDescription = "Pick date")
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showDatePicker = true },
-                )
-
-                // Payment channel
-                ExposedDropdownMenuBox(
-                    expanded = channelExpanded,
-                    onExpandedChange = { channelExpanded = it },
-                ) {
-                    OutlinedTextField(
-                        value = paymentMethod?.label ?: "Select channel",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Payment Channel") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(channelExpanded) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth(),
-                    )
-                    ExposedDropdownMenu(
-                        expanded = channelExpanded,
-                        onDismissRequest = { channelExpanded = false },
-                    ) {
-                        PaymentMethod.entries.forEach { method ->
-                            DropdownMenuItem(
-                                text = { Text(method.label) },
-                                onClick = { paymentMethod = method; channelExpanded = false },
-                            )
-                        }
-                    }
-                }
-
-                // Notes
-                OutlinedTextField(
-                    value = notes,
-                    onValueChange = { notes = it },
-                    label = { Text("Notes (optional)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-
-                // Auto-status hint
-                Text(
-                    "Status is set automatically based on whether payment is before or after the scheduled collection date.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (isValid) onConfirm(
-                        amount!!,
-                        selectedDateMs,
-                        paymentMethod,
-                        notes.trim().ifBlank { null },
-                    )
-                },
-                enabled = isValid,
-            ) { Text("Record") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
-}
-
-@Composable
-private fun AddMemberDialog(
-    currentMemberCount: Int,
-    totalSlots: Int,
-    onConfirm: (customerIds: List<String>) -> Unit,
-    onDismiss: () -> Unit,
-    autoSuggestViewModel: CustomerAutoSuggestViewModel = hiltViewModel(),
-) {
-    val suggestions by autoSuggestViewModel.suggestions.collectAsStateWithLifecycle()
-    var query by remember { mutableStateOf("") }
-    val pendingCustomers = remember { mutableStateListOf<Customer>() }
-    val totalSelected = currentMemberCount + pendingCustomers.size
-    val canAddMore = totalSelected < totalSlots
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.92f)
-                .fillMaxHeight(0.88f),
-            shape = MaterialTheme.shapes.large,
-            tonalElevation = 6.dp,
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-
-                // ── Header ────────────────────────────────────────────────
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column {
-                        Text("Add Members", style = MaterialTheme.typography.titleLarge)
-                        Text(
-                            if (canAddMore)
-                                "$totalSelected / $totalSlots slots filled"
-                            else
-                                "$totalSelected / $totalSlots  •  All slots filled",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (canAddMore)
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            else
-                                MaterialTheme.colorScheme.error,
-                        )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = onDismiss) { Text("Cancel") }
-                        Button(
-                            onClick = { onConfirm(pendingCustomers.map { it.id }) },
-                            enabled = pendingCustomers.isNotEmpty(),
-                        ) { Text("Save") }
-                    }
-                }
-
-                HorizontalDivider()
-
-                // ── Scrollable body ───────────────────────────────────────
-                LazyColumn(modifier = Modifier.weight(1f)) {
-
-                    // Queued selections
-                    if (pendingCustomers.isNotEmpty()) {
-                        item {
-                            Text(
-                                "Queued (${pendingCustomers.size})",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 4.dp),
-                            )
-                        }
-                        itemsIndexed(pendingCustomers) { i, customer ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 20.dp, vertical = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    "${currentMemberCount + i + 1}.  ${customer.name}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                IconButton(
-                                    onClick = { pendingCustomers.removeAt(i) },
-                                    modifier = Modifier.size(32.dp),
-                                ) {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = "Remove",
-                                        tint = MaterialTheme.colorScheme.error,
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                }
-                            }
-                        }
-                        item {
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                        }
-                    }
-
-                    // Search field
-                    item {
-                        OutlinedTextField(
-                            value = query,
-                            onValueChange = { q ->
-                                query = q
-                                autoSuggestViewModel.onQueryChange(q)
-                            },
-                            label = { Text("Search customer") },
-                            placeholder = { Text("Type a name…") },
-                            singleLine = true,
-                            enabled = canAddMore,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 8.dp),
-                        )
-                    }
-
-                    // Results
-                    when {
-                        !canAddMore -> item {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().padding(32.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    "All $totalSlots slots are filled.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.error,
-                                )
-                            }
-                        }
-
-                        query.isBlank() -> item {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().padding(32.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    "Start typing to search customers",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-
-                        suggestions.isEmpty() -> item {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().padding(32.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    "No customers found for \"$query\"",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-
-                        else -> items(suggestions) { customer ->
-                            val addedCount = pendingCustomers.count { it.id == customer.id }
-                            CustomerPickerRow(
-                                customer = customer,
-                                addedCount = addedCount,
-                                onClick = { pendingCustomers.add(customer) },
-                            )
-                        }
-                    }
-
-                    item { Spacer(modifier = Modifier.height(16.dp)) }
-                }
-            }
-        }
-    }
-}
-
-/**
- * Pasalo dialog: admin picks a replacement customer for a slot.
- * Tap a customer row to stage them, then confirm with the "Pasalo" button.
- */
-@Composable
-private fun EditSlotCustomerDialog(
-    slotRow: SlotRow,
-    onConfirm: (newCustomerId: String) -> Unit,
-    onDismiss: () -> Unit,
-    autoSuggestViewModel: CustomerAutoSuggestViewModel = hiltViewModel(),
-) {
-    val suggestions by autoSuggestViewModel.suggestions.collectAsStateWithLifecycle()
-    var query by remember { mutableStateOf("") }
-    var staged by remember { mutableStateOf<Customer?>(null) }
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.92f)
-                .fillMaxHeight(0.82f),
-            shape = MaterialTheme.shapes.large,
-            tonalElevation = 6.dp,
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-
-                // Header
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column {
-                        Text("Pasalo — Slot #${slotRow.position}", style = MaterialTheme.typography.titleLarge)
-                        Text(
-                            "Current: ${slotRow.customerName}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = onDismiss) { Text("Cancel") }
-                        Button(
-                            onClick = { staged?.let { onConfirm(it.id) } },
-                            enabled = staged != null,
-                        ) { Text("Pasalo") }
-                    }
-                }
-
-                // Staged selection preview
-                staged?.let { customer ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
-                            .padding(horizontal = 20.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "Replace with: ${customer.name}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            )
-                            Text(
-                                "Tap another customer to change selection",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        IconButton(
-                            onClick = { staged = null },
-                            modifier = Modifier.size(32.dp),
-                        ) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = "Clear selection",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp),
-                            )
-                        }
-                    }
-                }
-
-                HorizontalDivider()
-
-                // Search + results
-                LazyColumn(modifier = Modifier.weight(1f)) {
-                    item {
-                        OutlinedTextField(
-                            value = query,
-                            onValueChange = { q ->
-                                query = q
-                                autoSuggestViewModel.onQueryChange(q)
-                            },
-                            label = { Text("Search replacement customer") },
-                            placeholder = { Text("Type a name…") },
-                            singleLine = true,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 12.dp),
-                        )
-                    }
-
-                    when {
-                        query.isBlank() -> item {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().padding(32.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    "Search for the customer who will take over this slot",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                        suggestions.isEmpty() -> item {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().padding(32.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    "No customers found for \"$query\"",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                        else -> items(suggestions) { customer ->
-                            val isSelected = staged?.id == customer.id
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(
-                                        if (isSelected)
-                                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                                        else
-                                            Color.Transparent,
-                                    )
-                                    .clickable { staged = customer }
-                                    .padding(horizontal = 20.dp, vertical = 12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        customer.name,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                    )
-                                    customer.mobile?.takeIf { it.isNotBlank() }?.let {
-                                        Text(
-                                            it,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                }
-                                if (isSelected) {
-                                    Box(
-                                        modifier = Modifier
-                                            .background(
-                                                MaterialTheme.colorScheme.primary,
-                                                shape = MaterialTheme.shapes.small,
-                                            )
-                                            .padding(horizontal = 10.dp, vertical = 4.dp),
-                                    ) {
-                                        Text(
-                                            "Selected",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onPrimary,
-                                            fontWeight = FontWeight.Bold,
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    item { Spacer(modifier = Modifier.height(16.dp)) }
-                }
-            }
-        }
-    }
-}
-
-// ── Member payment history dialog ─────────────────────────────────────────────
-
-@Composable
-private fun MemberPaymentHistoryDialog(
-    slotRow: SlotRow,
-    slotBadge: String?,
-    currentRound: Int,
-    isAdmin: Boolean,
-    isAdminOrManager: Boolean,
-    groupStatus: PaluwaganGroupStatus?,
-    onEditPayment: (PaluwaganPayment) -> Unit,
-    onRecordPayment: (roundNumber: Int) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val dateFmt = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.92f)
-                .fillMaxHeight(0.82f),
-            shape = MaterialTheme.shapes.large,
-            tonalElevation = 6.dp,
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-
-                // Header
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column {
-                        Text("Payment History", style = MaterialTheme.typography.titleLarge)
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            Text(
-                                slotRow.customerName,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            if (slotBadge != null) {
-                                SlotBadge(slotBadge)
-                            }
-                        }
-                        if (slotRow.originalCustomerName != null) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(3.dp),
-                            ) {
-                                Icon(
-                                    Icons.Default.SwapHoriz,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(12.dp),
-                                )
-                                Text(
-                                    "was ${slotRow.originalCustomerName}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontStyle = FontStyle.Italic,
-                                )
-                            }
-                        }
-                    }
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
-                    }
-                }
-
-                HorizontalDivider()
-
-                // Payment rows (all rounds 1..currentRound)
-                if (currentRound == 0) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            "No rounds started yet",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                } else {
-                    LazyColumn(modifier = Modifier.weight(1f)) {
-                        items((1..currentRound).toList()) { round ->
-                            val payment = slotRow.payments[round]
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 20.dp, vertical = 12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                // Round + date + channel
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        "Round $round",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                    )
-                                    if (payment?.paymentDate != null) {
-                                        Text(
-                                            buildString {
-                                                append(dateFmt.format(Date(payment.paymentDate)))
-                                                payment.paymentMethod?.let { append("  •  ${it.label}") }
-                                                payment.amountPaid.let { append("  •  ₱%.2f".format(it)) }
-                                            },
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                    if (!payment?.notes.isNullOrBlank()) {
-                                        Text(
-                                            payment!!.notes!!,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                }
-
-                                // Status badge or Record button for unpaid past rounds
-                                val canRecordThisRound = isAdminOrManager &&
-                                    groupStatus == PaluwaganGroupStatus.ACTIVE &&
-                                    payment?.status == PaluwaganPaymentStatus.UNPAID
-                                PaymentBadgeOrButton(
-                                    status = payment?.status,
-                                    canRecord = canRecordThisRound,
-                                    onRecord = { onRecordPayment(round) },
-                                )
-
-                                // Admin edit button (only for recorded payments)
-                                if (isAdmin && payment != null &&
-                                    payment.status != PaluwaganPaymentStatus.UNPAID
-                                ) {
-                                    IconButton(
-                                        onClick = { onEditPayment(payment) },
-                                        modifier = Modifier.size(32.dp),
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Edit,
-                                            contentDescription = "Edit payment",
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    }
-                                }
-                            }
-
-                            if (round < currentRound) {
-                                HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
-                            }
-                        }
-
-                        item { Spacer(modifier = Modifier.height(16.dp)) }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ── Edit recorded payment dialog (admin only) ─────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun EditPaymentDialog(
-    payment: PaluwaganPayment,
-    onConfirm: (amount: Double, paymentDate: Long, paymentMethod: PaymentMethod?, notes: String?) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var amountRaw by rememberSaveable { mutableStateOf(payment.amountPaid.toString()) }
-    var paymentMethod by rememberSaveable { mutableStateOf(payment.paymentMethod) }
-    var channelExpanded by remember { mutableStateOf(false) }
-    var notes by rememberSaveable { mutableStateOf(payment.notes ?: "") }
-    var showDatePicker by remember { mutableStateOf(false) }
-
-    val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = payment.paymentDate ?: System.currentTimeMillis(),
-    )
-    val selectedDateMs = datePickerState.selectedDateMillis ?: (payment.paymentDate ?: System.currentTimeMillis())
-    val dateLabel = remember(selectedDateMs) {
-        SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(selectedDateMs))
-    }
-
-    val amount = amountRaw.toDoubleOrNull()
-    val isValid = amount != null && amount > 0
-
-    if (showDatePicker) {
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = { TextButton(onClick = { showDatePicker = false }) { Text("OK") } },
-            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel") } },
-        ) { DatePicker(state = datePickerState) }
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Edit Payment") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    "Round ${payment.roundNumber}  •  Editing will recompute PAID / LATE status",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-
-                OutlinedTextField(
-                    value = amountRaw,
-                    onValueChange = { amountRaw = it },
-                    label = { Text("Amount Paid (₱)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-
-                OutlinedTextField(
-                    value = dateLabel,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Payment Date") },
-                    trailingIcon = {
-                        IconButton(onClick = { showDatePicker = true }) {
-                            Icon(Icons.Default.CalendarToday, contentDescription = "Pick date")
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showDatePicker = true },
-                )
-
-                ExposedDropdownMenuBox(
-                    expanded = channelExpanded,
-                    onExpandedChange = { channelExpanded = it },
-                ) {
-                    OutlinedTextField(
-                        value = paymentMethod?.label ?: "Select channel",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Payment Channel") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(channelExpanded) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth(),
-                    )
-                    ExposedDropdownMenu(
-                        expanded = channelExpanded,
-                        onDismissRequest = { channelExpanded = false },
-                    ) {
-                        PaymentMethod.entries.forEach { method ->
-                            DropdownMenuItem(
-                                text = { Text(method.label) },
-                                onClick = { paymentMethod = method; channelExpanded = false },
-                            )
-                        }
-                    }
-                }
-
-                OutlinedTextField(
-                    value = notes,
-                    onValueChange = { notes = it },
-                    label = { Text("Notes (optional)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (isValid) onConfirm(amount!!, selectedDateMs, paymentMethod, notes.trim().ifBlank { null })
-                },
-                enabled = isValid,
-            ) { Text("Save") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
-}
-
-// ── Collect Pot dialog ────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CollectPotDialog(
-    slotRow: SlotRow,
-    onConfirm: (date: Long) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var showDatePicker by remember { mutableStateOf(false) }
-    val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = System.currentTimeMillis(),
-    )
-    val selectedDateMs = datePickerState.selectedDateMillis ?: System.currentTimeMillis()
-    val dateLabel = remember(selectedDateMs) {
-        SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(selectedDateMs))
-    }
-
-    if (showDatePicker) {
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = { TextButton(onClick = { showDatePicker = false }) { Text("OK") } },
-            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel") } },
-        ) { DatePicker(state = datePickerState) }
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Record Pot Collection") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    "Slot #${slotRow.position} — ${slotRow.customerName}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    "Record the actual date this member received the pot money.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                OutlinedTextField(
-                    value = dateLabel,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Collection Date") },
-                    trailingIcon = {
-                        IconButton(onClick = { showDatePicker = true }) {
-                            Icon(Icons.Default.CalendarToday, contentDescription = "Pick date")
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showDatePicker = true },
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(selectedDateMs) }) { Text("Save") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
-}
-
-@Composable
-private fun CustomerPickerRow(
-    customer: Customer,
-    addedCount: Int,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                customer.name,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-            )
-            customer.mobile?.takeIf { it.isNotBlank() }?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        if (addedCount > 0) {
-            Box(
-                modifier = Modifier
-                    .background(
-                        MaterialTheme.colorScheme.primaryContainer,
-                        shape = MaterialTheme.shapes.small,
-                    )
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
-            ) {
-                Text(
-                    "×$addedCount",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    fontWeight = FontWeight.Bold,
-                )
             }
         }
     }

@@ -105,6 +105,7 @@ fun SoldRecordEntity.toSyncDto() = SoldRecordSyncDto(
     sold_date = sold_date,
     notes = notes,
     payment_method = payment_method.name,
+    linked_layaway_id = linked_layaway_id,
     is_archived = is_archived,
     created_at = created_at,
     updated_at = updated_at,
@@ -154,6 +155,20 @@ fun DamagedRecordEntity.toSyncDto() = DamagedRecordSyncDto(
     is_deleted = is_deleted,
 )
 
+fun StockAdjustmentEntity.toSyncDto() = StockAdjustmentSyncDto(
+    adjustment_id = adjustment_id,
+    product_id = product_id,
+    quantity = quantity,
+    reason = reason,
+    notes = notes,
+    recorded_by = recorded_by,
+    date_recorded = date_recorded,
+    is_archived = is_archived,
+    created_at = created_at,
+    updated_at = updated_at,
+    is_deleted = is_deleted,
+)
+
 fun PaluwaganGroupEntity.toSyncDto() = PaluwaganGroupSyncDto(
     group_id = group_id,
     name = name,
@@ -177,6 +192,7 @@ fun PaluwaganSlotEntity.toSyncDto() = PaluwaganSlotSyncDto(
     original_customer_id = original_customer_id,
     position = position,
     pot_collected_at = pot_collected_at,
+    pot_payout_channel = pot_payout_channel,
     created_at = created_at,
     updated_at = updated_at,
     is_deleted = is_deleted,
@@ -308,6 +324,7 @@ fun SoldRecordSyncDto.toEntity() = SoldRecordEntity(
     sold_date = sold_date,
     notes = notes,
     payment_method = runCatching { PaymentMethod.valueOf(payment_method) }.getOrDefault(PaymentMethod.CASH),
+    linked_layaway_id = linked_layaway_id,
     is_archived = is_archived,
     created_at = created_at,
     updated_at = updated_at,
@@ -357,6 +374,20 @@ fun DamagedRecordSyncDto.toEntity() = DamagedRecordEntity(
     is_deleted = is_deleted,
 )
 
+fun StockAdjustmentSyncDto.toEntity() = StockAdjustmentEntity(
+    adjustment_id = adjustment_id,
+    product_id = product_id,
+    quantity = quantity,
+    reason = reason,
+    notes = notes,
+    recorded_by = recorded_by,
+    date_recorded = date_recorded,
+    is_archived = is_archived,
+    created_at = created_at,
+    updated_at = updated_at,
+    is_deleted = is_deleted,
+)
+
 fun PaluwaganGroupSyncDto.toEntity() = PaluwaganGroupEntity(
     group_id = group_id,
     name = name,
@@ -380,6 +411,7 @@ fun PaluwaganSlotSyncDto.toEntity() = PaluwaganSlotEntity(
     original_customer_id = original_customer_id,
     position = position,
     pot_collected_at = pot_collected_at,
+    pot_payout_channel = pot_payout_channel,
     created_at = created_at,
     updated_at = updated_at,
     is_deleted = is_deleted,

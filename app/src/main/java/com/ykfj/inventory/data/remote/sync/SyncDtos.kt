@@ -131,6 +131,7 @@ data class SoldRecordSyncDto(
     val sold_date: Long,
     val notes: String? = null,
     val payment_method: String = "CASH",
+    val linked_layaway_id: String? = null,
     val is_archived: Boolean,
     val created_at: Long,
     val updated_at: Long,
@@ -189,6 +190,23 @@ data class DamagedRecordSyncDto(
     val is_deleted: Boolean,
 )
 
+// ── Stock Adjustments ─────────────────────────────────────────────────────────
+
+@Serializable
+data class StockAdjustmentSyncDto(
+    val adjustment_id: String,
+    val product_id: String,
+    val quantity: Int,
+    val reason: String,
+    val notes: String? = null,
+    val recorded_by: String,
+    val date_recorded: Long,
+    val is_archived: Boolean,
+    val created_at: Long,
+    val updated_at: Long,
+    val is_deleted: Boolean,
+)
+
 // ── Paluwagan Groups ──────────────────────────────────────────────────────────
 
 @Serializable
@@ -218,6 +236,7 @@ data class PaluwaganSlotSyncDto(
     val original_customer_id: String? = null,
     val position: Int,
     val pot_collected_at: Long? = null,
+    val pot_payout_channel: String? = null,
     val created_at: Long,
     val updated_at: Long,
     val is_deleted: Boolean,
@@ -333,6 +352,7 @@ data class ChangesPayload(
     val layaway_records: List<LayawayRecordSyncDto> = emptyList(),
     val layaway_transactions: List<LayawayTransactionSyncDto> = emptyList(),
     val damaged_records: List<DamagedRecordSyncDto> = emptyList(),
+    val stock_adjustments: List<StockAdjustmentSyncDto> = emptyList(),
     val metal_rates: List<MetalRateSyncDto> = emptyList(),
     val categories: List<CategorySyncDto> = emptyList(),
     val suppliers: List<SupplierSyncDto> = emptyList(),

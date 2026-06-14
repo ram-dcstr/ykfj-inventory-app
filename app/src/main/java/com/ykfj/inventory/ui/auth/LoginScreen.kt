@@ -1,5 +1,6 @@
 package com.ykfj.inventory.ui.auth
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -35,12 +36,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.ykfj.inventory.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
@@ -83,14 +88,42 @@ fun LoginScreen(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(
-                text = "YKFJ Inventory",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-            )
+            // Logo built from three stacked layers so each part is tinted with a
+            // live system token: emblem + "FINE JEWELRY" in the system gold, the
+            // "YRISH KIM" wordmark in the system near-black — a two-tone on-palette
+            // mark (and it adapts automatically to the theme).
+            val brandGold = MaterialTheme.colorScheme.primary
+            val brandDark = MaterialTheme.colorScheme.onSurface
+            Column(
+                modifier = Modifier
+                    .widthIn(max = 320.dp)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.ykfj_logo_emblem),
+                    contentDescription = "Yrish Kim Fine Jewelry",
+                    contentScale = ContentScale.Fit,
+                    colorFilter = ColorFilter.tint(brandGold),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Image(
+                    painter = painterResource(R.drawable.ykfj_logo_name),
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    colorFilter = ColorFilter.tint(brandDark),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Image(
+                    painter = painterResource(R.drawable.ykfj_logo_tagline),
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    colorFilter = ColorFilter.tint(brandGold),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             Text(
                 text = "Sign in to continue",

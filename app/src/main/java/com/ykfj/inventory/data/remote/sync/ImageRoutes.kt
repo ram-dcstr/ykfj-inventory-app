@@ -4,6 +4,7 @@ import com.ykfj.inventory.data.local.image.ImageStorageManager
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
+import io.ktor.server.request.contentLength
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
@@ -12,6 +13,13 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import com.ykfj.inventory.data.local.db.dao.ProductImageDao
+
+/**
+ * Hard limit on a single image upload. ImageCompressor caps the full image at
+ * ~200KB and the thumb at ~15KB, so 5MB leaves an enormous margin while still
+ * blocking a malicious 1GB POST that would OOM the tablet.
+ */
+private const val MAX_IMAGE_UPLOAD_BYTES: Long = 5L * 1024L * 1024L
 
 fun Route.imageRoutes(imageStorageManager: ImageStorageManager, productImageDao: ProductImageDao) {
     route("/api/images") {
@@ -52,10 +60,30 @@ fun Route.imageRoutes(imageStorageManager: ImageStorageManager, productImageDao:
                 ?: return@post call.respond(HttpStatusCode.BadRequest)
             val useThumb = call.request.queryParameters["type"] == "thumb"
 
+            // Reject too-large uploads up front using the Content-Length header,
+            // so the malicious bytes are never read into memory. A client lying
+            // about its size will still be caught by a second check on the
+            // received array below.
+            val declaredSize = call.request.contentLength()
+            if (declaredSize != null && declaredSize > MAX_IMAGE_UPLOAD_BYTES) {
+                call.respond(
+                    HttpStatusCode.PayloadTooLarge,
+                    mapOf("error" to "Image exceeds ${MAX_IMAGE_UPLOAD_BYTES / 1024}KB limit"),
+                )
+                return@post
+            }
+
             val record = productImageDao.getById(imageId)
                 ?: return@post call.respond(HttpStatusCode.NotFound, mapOf("error" to "image metadata not found — push the row first"))
 
             val bytes = call.receive<ByteArray>()
+            if (bytes.size > MAX_IMAGE_UPLOAD_BYTES) {
+                call.respond(
+                    HttpStatusCode.PayloadTooLarge,
+                    mapOf("error" to "Image exceeds ${MAX_IMAGE_UPLOAD_BYTES / 1024}KB limit"),
+                )
+                return@post
+            }
             val file = if (useThumb) imageStorageManager.thumbFile(record.file_name)
                        else imageStorageManager.fullFile(record.file_name)
             file.parentFile?.mkdirs()

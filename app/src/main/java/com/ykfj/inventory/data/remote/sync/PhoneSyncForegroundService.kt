@@ -57,9 +57,19 @@ class PhoneSyncForegroundService : Service() {
         }
 
         syncLoop = serviceScope.launch {
+            // Exponential backoff on repeated failure so the phone doesn't
+            // hammer an offline tablet every 5 minutes forever (battery + LAN).
+            // Reset to the baseline interval on the first successful sync.
+            var delayMs = SYNC_INTERVAL_MS
             while (true) {
                 syncManager.sync()
-                delay(SYNC_INTERVAL_MS)
+                val status = syncManager.status.value
+                delayMs = if (status.lastError != null) {
+                    (delayMs * 2L).coerceAtMost(MAX_BACKOFF_MS)
+                } else {
+                    SYNC_INTERVAL_MS
+                }
+                delay(delayMs)
             }
         }
 
@@ -104,6 +114,8 @@ class PhoneSyncForegroundService : Service() {
     companion object {
         private const val CHANNEL_ID = "ykfj_phone_sync"
         private const val NOTIFICATION_ID = 1002
-        const val SYNC_INTERVAL_MS = 5 * 60 * 1000L // 5 minutes
+        const val SYNC_INTERVAL_MS = 5 * 60 * 1000L // 5 minutes (baseline)
+        /** Backoff cap — never wait longer than this between sync attempts. */
+        const val MAX_BACKOFF_MS = 60 * 60 * 1000L // 60 minutes
     }
 }

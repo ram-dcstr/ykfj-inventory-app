@@ -59,4 +59,40 @@ class SessionManager @Inject constructor() {
         if (lastActivityTimestamp == 0L) return true
         return System.currentTimeMillis() - lastActivityTimestamp > _idleTimeout.value.millis
     }
+
+    // ── App lock: require re-login after the app has been in the background a while ──
+
+    private var backgroundedAt: Long = 0L
+
+    /** Call when the whole app goes to the background (e.g. Activity `onStop`). */
+    fun onAppBackgrounded() {
+        backgroundedAt = System.currentTimeMillis()
+    }
+
+    /**
+     * Call when the app returns to the foreground (e.g. Activity `onStart`). Logs out and
+     * returns `true` if the app was backgrounded longer than [BACKGROUND_LOCK_GRACE_MS] —
+     * long enough that the user actually left, as opposed to a quick hop out to the photo
+     * picker / share sheet / file picker. Returning within the grace keeps the session.
+     */
+    fun onAppForegrounded(): Boolean {
+        val backgroundedSince = backgroundedAt
+        backgroundedAt = 0L
+        if (!isLoggedIn || backgroundedSince == 0L) return false
+        if (System.currentTimeMillis() - backgroundedSince > BACKGROUND_LOCK_GRACE_MS) {
+            logout()
+            return true
+        }
+        return false
+    }
+
+    companion object {
+        /**
+         * Grace window for app backgrounding. Coming back within this stays logged in (so
+         * the image picker / share sheet / file picker don't kick you out mid-task); staying
+         * away longer requires logging in again. A full app restart always requires login,
+         * since the session is held only in memory.
+         */
+        private const val BACKGROUND_LOCK_GRACE_MS = 60_000L
+    }
 }

@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.ykfj.inventory.data.remote.sync.SyncManager
 import com.ykfj.inventory.domain.model.User
 import com.ykfj.inventory.domain.sync.DeviceRole
@@ -59,13 +60,28 @@ fun SidebarContent(
                 .fillMaxHeight()
                 .padding(vertical = 12.dp),
         ) {
-            // App title
-            Text(
-                text = "YKFJ Inventory",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
-            )
+            // App brand — stacked wordmark echoing the logo: the name in a refined,
+            // letter-spaced uppercase over a smaller, wider-spaced "FINE JEWELRY"
+            // tagline in the system gold. Two-tone (dark name + gold tagline).
+            Column(
+                modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 16.dp),
+            ) {
+                Text(
+                    text = "YRISH KIM",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 3.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "FINE JEWELRY",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 5.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
 
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
             Spacer(modifier = Modifier.height(8.dp))
@@ -81,40 +97,37 @@ fun SidebarContent(
                 } else {
                     Screen.allScreens
                 }
-                visibleScreens.forEach { screen ->
-                    val badgeCount = when (screen) {
-                        Screen.Layaway -> layawayOverdueCount
-                        Screen.Paluwagan -> paluwaganDueCount
-                        else -> 0
-                    }
+                val mainItems = visibleScreens.filter { it.group == SidebarGroup.MAIN }
+                val manageItems = visibleScreens.filter { it.group == SidebarGroup.MANAGE }
 
-                    NavigationDrawerItem(
-                        icon = {
-                            Icon(
-                                imageVector = screen.icon,
-                                contentDescription = null,
-                            )
-                        },
-                        label = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                Text(text = screen.label)
-                                if (badgeCount > 0) {
-                                    Badge(
-                                        containerColor = AlertBadgeRed,
-                                        contentColor = MaterialTheme.colorScheme.onError,
-                                    ) {
-                                        Text(text = badgeCount.toString())
-                                    }
-                                }
-                            }
-                        },
+                mainItems.forEach { screen ->
+                    SidebarNavItem(
+                        screen = screen,
                         selected = selectedScreen == screen,
+                        layawayOverdueCount = layawayOverdueCount,
+                        paluwaganDueCount = paluwaganDueCount,
                         onClick = { onScreenSelected(screen) },
-                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
                     )
+                }
+
+                // "Manage" zone — only rendered when the role has items here (Staff don't).
+                if (manageItems.isNotEmpty()) {
+                    Text(
+                        text = "MANAGE",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 28.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
+                    )
+                    manageItems.forEach { screen ->
+                        SidebarNavItem(
+                            screen = screen,
+                            selected = selectedScreen == screen,
+                            layawayOverdueCount = layawayOverdueCount,
+                            paluwaganDueCount = paluwaganDueCount,
+                            onClick = { onScreenSelected(screen) },
+                        )
+                    }
                 }
             }
 
@@ -143,6 +156,49 @@ fun SidebarContent(
             }
         }
     }
+}
+
+@Composable
+private fun SidebarNavItem(
+    screen: Screen,
+    selected: Boolean,
+    layawayOverdueCount: Int,
+    paluwaganDueCount: Int,
+    onClick: () -> Unit,
+) {
+    val badgeCount = when (screen) {
+        Screen.Layaway -> layawayOverdueCount
+        Screen.Paluwagan -> paluwaganDueCount
+        else -> 0
+    }
+
+    NavigationDrawerItem(
+        icon = {
+            Icon(
+                imageVector = screen.icon,
+                contentDescription = null,
+            )
+        },
+        label = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(text = screen.label)
+                if (badgeCount > 0) {
+                    Badge(
+                        containerColor = AlertBadgeRed,
+                        contentColor = MaterialTheme.colorScheme.onError,
+                    ) {
+                        Text(text = badgeCount.toString())
+                    }
+                }
+            }
+        },
+        selected = selected,
+        onClick = onClick,
+        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+    )
 }
 
 @Composable

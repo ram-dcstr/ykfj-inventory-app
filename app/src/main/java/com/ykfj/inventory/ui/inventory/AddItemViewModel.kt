@@ -132,6 +132,7 @@ class AddItemViewModel @Inject constructor(
         notes: String?,
         imageFile: File?,
     ) {
+        val name = name.trim()
         val userId = sessionManager.currentUser.value?.id ?: return
         if (name.isBlank()) { _saveState.value = _saveState.value.copy(error = "Name is required"); return }
         if (capitalPrice <= 0) { _saveState.value = _saveState.value.copy(error = "Capital price must be > 0"); return }

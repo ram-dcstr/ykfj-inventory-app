@@ -1,5 +1,7 @@
 package com.ykfj.inventory.domain.model
 
+import com.ykfj.inventory.data.local.db.enums.PaymentMethod
+
 /**
  * A slot in a paluwagan group. A customer may hold multiple slots in the
  * same group — each is a distinct row with its own [position] (1-based).
@@ -13,6 +15,8 @@ data class PaluwaganSlot(
     val position: Int,
     /** Actual date the collector physically received the pot. Null until recorded by admin. */
     val potCollectedAt: Long? = null,
+    /** How the pot was paid out. Null until collected; treated as CASH for legacy rows. */
+    val potPayoutChannel: PaymentMethod? = null,
     val createdAt: Long,
     val updatedAt: Long,
 )

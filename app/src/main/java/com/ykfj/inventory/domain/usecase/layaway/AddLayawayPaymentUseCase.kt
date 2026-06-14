@@ -9,6 +9,7 @@ import com.ykfj.inventory.domain.repository.CustomerRepository
 import com.ykfj.inventory.domain.repository.LayawayRepository
 import com.ykfj.inventory.domain.repository.ProductRepository
 import com.ykfj.inventory.domain.usecase.activitylog.LogActivityUseCase
+import com.ykfj.inventory.util.CurrencyFormatter
 import java.util.UUID
 import javax.inject.Inject
 
@@ -77,7 +78,7 @@ class AddLayawayPaymentUseCase @Inject constructor(
         logActivity(
             userId = params.actorUserId,
             action = ActivityAction.PAYMENT,
-            description = "Payment ₱${"%.2f".format(params.amount)} added to layaway ${params.layawayId}",
+            description = "Payment ${CurrencyFormatter.format(params.amount)} added to layaway ${params.layawayId}",
             entityType = "layaway_record",
             entityId = params.layawayId,
         )

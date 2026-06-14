@@ -17,6 +17,9 @@ interface SoldRecordRepository {
     /** Most recent non-deleted sold record for a product — used by revert. */
     suspend fun getMostRecentForProduct(productId: String): SoldRecord?
 
+    /** Count of non-deleted sold records referencing [productId]. Used by the delete-product guard. */
+    suspend fun countActiveForProduct(productId: String): Int
+
     /** Finds the auto-created sold record from a layaway completion (the layaway-revert flow needs to clean it up). */
     suspend fun findByLayawayCompletion(layawayId: String): SoldRecord?
 

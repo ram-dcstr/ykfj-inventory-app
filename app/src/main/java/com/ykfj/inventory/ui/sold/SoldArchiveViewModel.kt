@@ -116,6 +116,11 @@ class SoldArchiveViewModel @Inject constructor(
         _selectedDate.value = GetSoldRecordsUseCase.startOfDay(dateMillis)
     }
 
+    /** Snaps the date filter back to the current day. */
+    fun resetToToday() {
+        selectDate(System.currentTimeMillis())
+    }
+
     fun clearError() {
         _pageState.value = _pageState.value.copy(error = null)
     }

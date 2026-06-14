@@ -16,6 +16,7 @@ import com.ykfj.inventory.data.local.db.entity.PaluwaganSlotEntity
 import com.ykfj.inventory.data.local.db.entity.ProductEntity
 import com.ykfj.inventory.data.local.db.entity.ProductImageEntity
 import com.ykfj.inventory.data.local.db.entity.SoldRecordEntity
+import com.ykfj.inventory.data.local.db.entity.StockAdjustmentEntity
 import com.ykfj.inventory.data.local.db.entity.SupplierEntity
 import com.ykfj.inventory.data.local.db.entity.UserEntity
 import com.ykfj.inventory.domain.sync.PendingSyncManager
@@ -72,6 +73,11 @@ class SyncEnqueuer @Inject constructor(
     suspend fun enqueueDamagedRecord(e: DamagedRecordEntity, action: SyncAction = SyncAction.UPDATE) =
         pendingSyncManager.enqueue(
             "damaged_records", e.damaged_id, action, json.encodeToString(e.toSyncDto()),
+        )
+
+    suspend fun enqueueStockAdjustment(e: StockAdjustmentEntity, action: SyncAction = SyncAction.UPDATE) =
+        pendingSyncManager.enqueue(
+            "stock_adjustments", e.adjustment_id, action, json.encodeToString(e.toSyncDto()),
         )
 
     suspend fun enqueuePaluwaganGroup(e: PaluwaganGroupEntity, action: SyncAction = SyncAction.UPDATE) =

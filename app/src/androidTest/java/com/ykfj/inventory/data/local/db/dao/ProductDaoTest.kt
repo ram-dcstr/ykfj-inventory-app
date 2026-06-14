@@ -161,13 +161,16 @@ class ProductDaoTest {
     }
 
     @Test
-    fun countByIdComponents_scopesByCombo() = runTest {
-        productDao.insert(product("p1", name = "Cuban", categoryId = "cat-1"))
-        productDao.insert(product("p2", name = "Cuban", categoryId = "cat-1"))
-        productDao.insert(product("p3", name = "Rope", categoryId = "cat-1"))
+    fun maxSequenceForPrefix_returnsHighestSuffix_includingDeleted() = runTest {
+        productDao.insert(product("PYX-FXD-NCK-000001"))
+        productDao.insert(product("PYX-FXD-NCK-000004", isDeleted = true)) // still occupies its slot
+        productDao.insert(product("RPX-FXD-NCK-000001")) // different prefix, ignored
 
-        assertEquals(2, productDao.countByIdComponents("Cuban", null, "cat-1"))
-        assertEquals(1, productDao.countByIdComponents("Rope", null, "cat-1"))
+        // Highest suffix for the prefix is 4, even though that row is soft-deleted —
+        // so the next ID will be 000005 and won't collide.
+        assertEquals(4, productDao.maxSequenceForPrefix("PYX-FXD-NCK-"))
+        // No product uses this prefix yet → null (generator treats as 0 → first ID 000001).
+        assertEquals(null, productDao.maxSequenceForPrefix("ZZZ-FXD-NCK-"))
     }
 
     @Test

@@ -39,18 +39,52 @@ interface PaluwaganPaymentDao {
     fun observeForSlot(slotId: String): Flow<List<PaluwaganPaymentEntity>>
 
     /**
-     * Count of payments due today across all active groups. Powers the red
-     * badge on the Paluwagan sidebar item.
+     * Count of UNPAID payments whose computed due-date falls in [dayStart, dayEnd]
+     * across all active, non-archived groups. Powers the red badge on the
+     * Paluwagan sidebar item.
+     *
+     * Due date is derived from the parent group as
+     * `start_date + (round_number - 1) * frequency_days * 86_400_000ms`,
+     * since the payment row itself doesn't store a due date — `payment_date`
+     * is when the payment was actually received (null while UNPAID).
      */
     @Query(
         """
-        SELECT COUNT(*) FROM paluwagan_payments
-        WHERE is_deleted = 0 AND status = 'UNPAID'
-          AND payment_date IS NOT NULL
-          AND payment_date BETWEEN :dayStart AND :dayEnd
+        SELECT COUNT(*) FROM paluwagan_payments p
+        JOIN paluwagan_groups g ON g.group_id = p.group_id
+        WHERE p.is_deleted = 0 AND p.status = 'UNPAID'
+          AND g.is_deleted = 0 AND g.is_archived = 0 AND g.status = 'ACTIVE'
+          AND (g.start_date + (p.round_number - 1) * g.frequency_days * 86400000)
+              BETWEEN :dayStart AND :dayEnd
         """,
     )
     fun observeDueTodayCount(dayStart: Long, dayEnd: Long): Flow<Int>
+
+    /**
+     * Daily Cash (Phase 11): total contributions actually received on a day through
+     * a given payment channel — money coming IN to the drawer.
+     *
+     * Filters on [payment_date] (when the cash was received), so a round prepaid weeks
+     * early lands on the day it was paid, not the day it matures. Summing [amount_paid]
+     * across the day's rows reconciles to the real cash taken, because an advance lump
+     * is split across its rows (main remainder + one contribution per seeded round) with
+     * a shared payment_date. Legacy rows with a null channel are treated as CASH, matching
+     * the sold/layaway default. Returns 0.0 when no rows match.
+     */
+    @Query(
+        """
+        SELECT COALESCE(SUM(amount_paid), 0.0) FROM paluwagan_payments
+        WHERE is_deleted = 0
+          AND status != 'UNPAID'
+          AND COALESCE(payment_channel, 'CASH') = :channel
+          AND payment_date BETWEEN :startMillis AND :endMillis
+        """,
+    )
+    fun observeContributionSumByChannelForDay(
+        channel: String,
+        startMillis: Long,
+        endMillis: Long,
+    ): Flow<Double>
 
     @Query("SELECT * FROM paluwagan_payments WHERE payment_id = :paymentId LIMIT 1")
     suspend fun getById(paymentId: String): PaluwaganPaymentEntity?

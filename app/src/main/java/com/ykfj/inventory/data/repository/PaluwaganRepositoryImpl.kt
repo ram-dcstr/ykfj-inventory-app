@@ -38,6 +38,9 @@ class PaluwaganRepositoryImpl @Inject constructor(
     override fun observeActiveGroups(): Flow<List<PaluwaganGroup>> =
         groupDao.observeActive().map { it.map { e -> e.toDomain() } }
 
+    override fun observeDueTodayCount(dayStart: Long, dayEnd: Long): Flow<Int> =
+        paymentDao.observeDueTodayCount(dayStart, dayEnd)
+
     override fun observeGroup(groupId: String): Flow<PaluwaganGroup?> =
         groupDao.observeById(groupId).map { it?.toDomain() }
 
@@ -76,10 +79,16 @@ class PaluwaganRepositoryImpl @Inject constructor(
 
     override suspend fun swapPositions(slotIdA: String, slotIdB: String) {
         val now = System.currentTimeMillis()
-        val a = slotDao.getById(slotIdA) ?: return
-        val b = slotDao.getById(slotIdB) ?: return
-        slotDao.updatePosition(slotIdA, b.position, now)
-        slotDao.updatePosition(slotIdB, a.position, now)
+        // Atomic: read both slots and write both new positions in one transaction so a
+        // crash or concurrent swap can't leave the two rows with duplicate/orphan positions.
+        val swapped = db.withTransaction {
+            val a = slotDao.getById(slotIdA) ?: return@withTransaction null
+            val b = slotDao.getById(slotIdB) ?: return@withTransaction null
+            slotDao.updatePosition(slotIdA, b.position, now)
+            slotDao.updatePosition(slotIdB, a.position, now)
+            a to b
+        } ?: return
+        val (a, b) = swapped
         syncEnqueuer.enqueuePaluwaganSlot(a.copy(position = b.position, updated_at = now))
         syncEnqueuer.enqueuePaluwaganSlot(b.copy(position = a.position, updated_at = now))
     }
@@ -149,14 +158,17 @@ class PaluwaganRepositoryImpl @Inject constructor(
 
     override suspend fun reorderSlots(groupId: String, orderedSlotIds: List<String>) {
         val now = System.currentTimeMillis()
-        orderedSlotIds.forEachIndexed { index, slotId ->
-            val existing = slotDao.getById(slotId) ?: return@forEachIndexed
-            val newPosition = index + 1
-            slotDao.updatePosition(slotId, newPosition, now)
-            syncEnqueuer.enqueuePaluwaganSlot(
-                existing.copy(position = newPosition, updated_at = now),
-            )
+        // Atomic: write all new positions in a single transaction so a partial reorder
+        // can't leave the group with duplicate or missing positions.
+        val updates = db.withTransaction {
+            orderedSlotIds.mapIndexedNotNull { index, slotId ->
+                val existing = slotDao.getById(slotId) ?: return@mapIndexedNotNull null
+                val newPosition = index + 1
+                slotDao.updatePosition(slotId, newPosition, now)
+                existing.copy(position = newPosition, updated_at = now)
+            }
         }
+        updates.forEach { syncEnqueuer.enqueuePaluwaganSlot(it) }
     }
 
     override suspend fun updateSlotCustomer(slotId: String, newCustomerId: String) {
@@ -168,12 +180,13 @@ class PaluwaganRepositoryImpl @Inject constructor(
         )
     }
 
-    override suspend fun recordPotCollection(slotId: String, date: Long) {
+    override suspend fun recordPotCollection(slotId: String, date: Long, payoutChannel: PaymentMethod?) {
         val existing = slotDao.getById(slotId) ?: return
         val now = System.currentTimeMillis()
-        slotDao.updatePotCollectedAt(slotId, date, now)
+        val channel = payoutChannel?.name
+        slotDao.updatePotCollectedAt(slotId, date, channel, now)
         syncEnqueuer.enqueuePaluwaganSlot(
-            existing.copy(pot_collected_at = date, updated_at = now),
+            existing.copy(pot_collected_at = date, pot_payout_channel = channel, updated_at = now),
         )
     }
 

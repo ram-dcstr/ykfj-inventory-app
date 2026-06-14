@@ -40,33 +40,44 @@ class AddProductUseCase @Inject constructor(
     )
 
     suspend operator fun invoke(params: Params): Product {
-        val now = System.currentTimeMillis()
-        val id = productIdGenerator.generate(
-            name = params.name,
-            metalRateName = params.metalRateName,
-            categoryName = params.categoryName,
-            metalRateId = params.metalRateId,
-            categoryId = params.categoryId,
-        )
-        val product = Product(
-            id = id,
-            name = params.name.trim(),
-            categoryId = params.categoryId,
-            metalRateId = params.metalRateId,
-            supplierId = params.supplierId,
-            dateAcquired = params.dateAcquired,
-            pricingType = params.pricingType,
-            capitalPrice = params.capitalPrice,
-            sellingPrice = if (params.pricingType == PricingType.FIXED) params.sellingPrice else null,
-            weightGrams = if (params.pricingType == PricingType.WEIGHTED) params.weightGrams else null,
-            size = params.size?.trim()?.ifBlank { null },
-            quantity = params.quantity,
-            notes = params.notes?.trim()?.ifBlank { null },
-            status = ProductStatus.AVAILABLE,
-            createdAt = now,
-            updatedAt = now,
-        )
-        productRepository.upsert(product)
+        val name = params.name.trim()
+        // Race-safe insert: regenerate the ID and retry on UNIQUE conflict.
+        // The conflict can happen when two devices add a product with the
+        // same name+rate+category combo at roughly the same time — both
+        // read the same sequence count, then one of the inserts collides.
+        var attempt = 0
+        var product: Product
+        while (true) {
+            val now = System.currentTimeMillis()
+            val id = productIdGenerator.generate(
+                name = name,
+                metalRateName = params.metalRateName,
+                categoryName = params.categoryName,
+            )
+            product = Product(
+                id = id,
+                name = name,
+                categoryId = params.categoryId,
+                metalRateId = params.metalRateId,
+                supplierId = params.supplierId,
+                dateAcquired = params.dateAcquired,
+                pricingType = params.pricingType,
+                capitalPrice = params.capitalPrice,
+                sellingPrice = if (params.pricingType == PricingType.FIXED) params.sellingPrice else null,
+                weightGrams = if (params.pricingType == PricingType.WEIGHTED) params.weightGrams else null,
+                size = params.size?.trim()?.ifBlank { null },
+                quantity = params.quantity,
+                notes = params.notes?.trim()?.ifBlank { null },
+                status = ProductStatus.AVAILABLE,
+                createdAt = now,
+                updatedAt = now,
+            )
+            if (productRepository.tryAddNew(product)) break
+            attempt++
+            if (attempt >= MAX_ID_RETRIES) {
+                error("Could not generate unique product ID for '$name' after $MAX_ID_RETRIES attempts")
+            }
+        }
 
         params.imageFile?.let { imageStorageManager.saveImage(product.id, it) }
 
@@ -78,5 +89,9 @@ class AddProductUseCase @Inject constructor(
             entityId = product.id,
         )
         return product
+    }
+
+    private companion object {
+        const val MAX_ID_RETRIES = 5
     }
 }

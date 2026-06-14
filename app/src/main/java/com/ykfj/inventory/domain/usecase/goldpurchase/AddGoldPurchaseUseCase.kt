@@ -5,6 +5,7 @@ import com.ykfj.inventory.domain.model.GoldPurchaseItem
 import com.ykfj.inventory.domain.model.GoldPurchaseRecord
 import com.ykfj.inventory.domain.repository.GoldPurchaseRepository
 import com.ykfj.inventory.domain.usecase.activitylog.LogActivityUseCase
+import com.ykfj.inventory.util.CurrencyFormatter
 import java.util.UUID
 import javax.inject.Inject
 
@@ -91,7 +92,7 @@ class AddGoldPurchaseUseCase @Inject constructor(
         logActivity(
             userId = params.recordedBy,
             action = ActivityAction.GOLD_PURCHASED,
-            description = "Gold purchase recorded — ${items.size} item(s), total ₱${"%.2f".format(totalPaid)}",
+            description = "Gold purchase recorded — ${items.size} item(s), total ${CurrencyFormatter.format(totalPaid)}",
             entityType = "gold_purchase_record",
             entityId = recordId,
         )

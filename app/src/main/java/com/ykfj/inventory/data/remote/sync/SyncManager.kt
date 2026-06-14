@@ -248,6 +248,12 @@ class SyncManager @Inject constructor(
             else db.damagedRecordDao().update(dto.toEntity())
         }
 
+        changes.stock_adjustments.forEach { dto ->
+            val existing = db.stockAdjustmentDao().getById(dto.adjustment_id)
+            if (existing == null) runCatching { db.stockAdjustmentDao().insert(dto.toEntity()) }
+            else db.stockAdjustmentDao().update(dto.toEntity())
+        }
+
         changes.paluwagan_groups.forEach { dto ->
             val existing = db.paluwaganGroupDao().getById(dto.group_id)
             if (existing == null) runCatching { db.paluwaganGroupDao().insert(dto.toEntity()) }
@@ -327,6 +333,7 @@ class SyncManager @Inject constructor(
         val layawayRecords = mutableListOf<LayawayRecordSyncDto>()
         val layawayTransactions = mutableListOf<LayawayTransactionSyncDto>()
         val damagedRecords = mutableListOf<DamagedRecordSyncDto>()
+        val stockAdjustments = mutableListOf<StockAdjustmentSyncDto>()
         val paluwaganGroups = mutableListOf<PaluwaganGroupSyncDto>()
         val paluwaganSlots = mutableListOf<PaluwaganSlotSyncDto>()
         val paluwaganPayments = mutableListOf<PaluwaganPaymentSyncDto>()
@@ -340,8 +347,17 @@ class SyncManager @Inject constructor(
         val goldPurchaseItems = mutableListOf<GoldPurchaseItemSyncDto>()
         val cashMovements = mutableListOf<CashMovementSyncDto>()
 
+        // Track which entries we actually managed to decode. Without this, a
+        // single poisoned payload would either silently flow into SYNCED on
+        // push success (losing visibility of the failure) or keep failing
+        // forever on every cycle. We mark the bad ones POISONED so they
+        // (a) stop being retried by `getPending()`, and (b) remain in the DB
+        // as evidence the dev can inspect.
+        val decodedIds = mutableListOf<String>()
+        val poisonedIds = mutableListOf<String>()
+
         for (entry in pending) {
-            runCatching {
+            val ok = runCatching {
                 when (entry.entity_type) {
                     "products" -> products.add(json.decodeFromString(entry.payload))
                     "customers" -> customers.add(json.decodeFromString(entry.payload))
@@ -349,6 +365,7 @@ class SyncManager @Inject constructor(
                     "layaway_records" -> layawayRecords.add(json.decodeFromString(entry.payload))
                     "layaway_transactions" -> layawayTransactions.add(json.decodeFromString(entry.payload))
                     "damaged_records" -> damagedRecords.add(json.decodeFromString(entry.payload))
+                    "stock_adjustments" -> stockAdjustments.add(json.decodeFromString(entry.payload))
                     "paluwagan_groups" -> paluwaganGroups.add(json.decodeFromString(entry.payload))
                     "paluwagan_slots" -> paluwaganSlots.add(json.decodeFromString(entry.payload))
                     "paluwagan_payments" -> paluwaganPayments.add(json.decodeFromString(entry.payload))
@@ -361,9 +378,20 @@ class SyncManager @Inject constructor(
                     "gold_purchase_records" -> goldPurchaseRecords.add(json.decodeFromString(entry.payload))
                     "gold_purchase_items" -> goldPurchaseItems.add(json.decodeFromString(entry.payload))
                     "cash_movements" -> cashMovements.add(json.decodeFromString(entry.payload))
-                    else -> Log.w(TAG, "Unknown entity_type in pending queue: ${entry.entity_type}")
+                    else -> error("Unknown entity_type: ${entry.entity_type}")
                 }
-            }.onFailure { Log.w(TAG, "Failed to decode pending entry ${entry.id}", it) }
+                Unit
+            }.onFailure { cause ->
+                Log.e(TAG, "Poisoning pending entry ${entry.id} (${entry.entity_type}/${entry.entity_id}): cannot decode payload", cause)
+            }.isSuccess
+            if (ok) decodedIds.add(entry.id) else poisonedIds.add(entry.id)
+        }
+
+        // Stop retrying poisoned entries forever — mark before push so even a
+        // push failure on the same cycle doesn't reset them to PENDING.
+        if (poisonedIds.isNotEmpty()) {
+            val now = System.currentTimeMillis()
+            poisonedIds.forEach { pendingSyncDao.updateStatus(it, "POISONED", now) }
         }
 
         val payload = ChangesPayload(
@@ -373,6 +401,7 @@ class SyncManager @Inject constructor(
             layaway_records = layawayRecords,
             layaway_transactions = layawayTransactions,
             damaged_records = damagedRecords,
+            stock_adjustments = stockAdjustments,
             paluwagan_groups = paluwaganGroups,
             paluwagan_slots = paluwaganSlots,
             paluwagan_payments = paluwaganPayments,
@@ -390,16 +419,22 @@ class SyncManager @Inject constructor(
 
         val response = syncClient.push(payload) ?: run {
             val now = System.currentTimeMillis()
-            pending.forEach { pendingSyncDao.updateStatus(it.id, "FAILED", now) }
-            Log.w(TAG, "Push failed — ${pending.size} entries marked FAILED")
+            // Only flip the decoded entries to FAILED — poisoned ones were
+            // already marked above and shouldn't be touched.
+            decodedIds.forEach { pendingSyncDao.updateStatus(it, "FAILED", now) }
+            Log.w(TAG, "Push failed — ${decodedIds.size} entries marked FAILED, ${poisonedIds.size} poisoned")
             return
         }
 
         if (response.accepted) {
             val now = System.currentTimeMillis()
-            pending.forEach { pendingSyncDao.updateStatus(it.id, "SYNCED", now) }
+            decodedIds.forEach { pendingSyncDao.updateStatus(it, "SYNCED", now) }
             pendingSyncDao.clearSynced()
-            Log.i(TAG, "Pushed ${pending.size} pending entries to tablet")
+            Log.i(
+                TAG,
+                "Pushed ${decodedIds.size} pending entries to tablet" +
+                    if (poisonedIds.isEmpty()) "" else " (${poisonedIds.size} POISONED)",
+            )
 
             // Upload bytes for any product_images we just pushed. Metadata row
             // exists on the tablet now (we pushed it above), so the tablet will

@@ -19,6 +19,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -31,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -46,6 +49,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -62,6 +67,7 @@ fun BackupScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
     var pendingRestoreUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var showBackupPasswordDialog by remember { mutableStateOf(false) }
 
     val pickFile = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
@@ -100,7 +106,7 @@ fun BackupScreen(
                 ManualBackupCard(
                     lastManualAt = state.lastManualAt,
                     isWorking = state.isWorking,
-                    onBackup = viewModel::runManualBackup,
+                    onBackup = { showBackupPasswordDialog = true },
                 )
             }
             item {
@@ -110,7 +116,7 @@ fun BackupScreen(
                 RestoreCard(
                     isWorking = state.isWorking,
                     isAdmin = state.isAdmin,
-                    onPick = { pickFile.launch(arrayOf("application/zip")) },
+                    onPick = { pickFile.launch(arrayOf("application/zip", "application/octet-stream")) },
                 )
             }
             if (state.autoBackups.isNotEmpty()) {
@@ -127,22 +133,57 @@ fun BackupScreen(
         }
     }
 
+    if (showBackupPasswordDialog) {
+        BackupPasswordDialog(
+            onConfirm = { password ->
+                showBackupPasswordDialog = false
+                viewModel.runManualBackup(password)
+            },
+            onDismiss = { showBackupPasswordDialog = false },
+        )
+    }
+
     pendingRestoreUri?.let { uri ->
+        var restorePassword by remember { mutableStateOf("") }
+        var passwordVisible by remember { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = { pendingRestoreUri = null },
             title = { Text("Restore from backup?") },
             text = {
-                Text(
-                    "This will replace the current database (and any product images) " +
-                        "with the contents of the selected backup. The app will close " +
-                        "and restart. This cannot be undone.",
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "This will replace the current database (and any product images) " +
+                            "with the contents of the selected backup. The app will close " +
+                            "and restart. This cannot be undone.",
+                    )
+                    OutlinedTextField(
+                        value = restorePassword,
+                        onValueChange = { restorePassword = it },
+                        label = { Text("Password (encrypted backups only)") },
+                        singleLine = true,
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(
+                                    imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        "Leave blank if the backup is an unencrypted .zip.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
                         pendingRestoreUri = null
-                        viewModel.restoreFromUri(uri)
+                        viewModel.restoreFromUri(uri, restorePassword.ifBlank { null })
                     },
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.error,
@@ -306,6 +347,73 @@ private fun AutoBackupRow(backup: BackupManager.BackupSummary) {
             HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
         }
     }
+}
+
+@Composable
+private fun BackupPasswordDialog(
+    onConfirm: (password: String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var password by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+    var visible by remember { mutableStateOf(false) }
+    val mismatch = confirm.isNotEmpty() && password != confirm
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Encrypt this backup?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Backups are saved to the shared Downloads folder, where other apps " +
+                        "can read them. Set a password to encrypt the file — you'll need it " +
+                        "to restore. Leave blank to save an unencrypted backup.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    singleLine = true,
+                    visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { visible = !visible }) {
+                            Icon(
+                                imageVector = if (visible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = if (visible) "Hide password" else "Show password",
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = confirm,
+                    onValueChange = { confirm = it },
+                    label = { Text("Confirm password") },
+                    singleLine = true,
+                    isError = mismatch,
+                    visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
+                    supportingText = if (mismatch) {
+                        { Text("Passwords don't match") }
+                    } else {
+                        null
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(password.ifBlank { null }) },
+                // Allow blank (= unencrypted). Block only the mismatch case.
+                enabled = !mismatch,
+            ) { Text(if (password.isBlank()) "Back up unencrypted" else "Encrypt & back up") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
 }
 
 @Composable
