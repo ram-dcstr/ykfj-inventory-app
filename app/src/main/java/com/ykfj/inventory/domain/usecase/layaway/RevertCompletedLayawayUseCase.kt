@@ -3,14 +3,16 @@ package com.ykfj.inventory.domain.usecase.layaway
 import com.ykfj.inventory.data.local.db.enums.ActivityAction
 import com.ykfj.inventory.data.local.db.enums.LayawayStatus
 import com.ykfj.inventory.data.local.db.enums.ProductStatus
+import com.ykfj.inventory.data.local.db.enums.UserRole
 import com.ykfj.inventory.domain.repository.LayawayRepository
 import com.ykfj.inventory.domain.repository.ProductRepository
 import com.ykfj.inventory.domain.repository.SoldRecordRepository
+import com.ykfj.inventory.domain.repository.UserRepository
 import com.ykfj.inventory.domain.usecase.activitylog.LogActivityUseCase
 import javax.inject.Inject
 
 /**
- * Admin-only: undoes [CompleteLayawayUseCase] for a COMPLETED record.
+ * Admin-only (enforced here): undoes [CompleteLayawayUseCase] for a COMPLETED record.
  *
  * Restores the layaway to ACTIVE, clears `completion_date`, soft-deletes the
  * auto-generated SoldRecord (so the Sold Archive and analytics stay accurate),
@@ -20,6 +22,7 @@ class RevertCompletedLayawayUseCase @Inject constructor(
     private val layawayRepository: LayawayRepository,
     private val soldRecordRepository: SoldRecordRepository,
     private val productRepository: ProductRepository,
+    private val userRepository: UserRepository,
     private val logActivity: LogActivityUseCase,
 ) {
     data class Params(val layawayId: String, val actorUserId: String)
@@ -28,10 +31,15 @@ class RevertCompletedLayawayUseCase @Inject constructor(
         object Success : Result()
         object RecordNotFound : Result()
         object NotCompleted : Result()
+        /** Actor's role is not ADMIN. */
+        object NotAuthorized : Result()
         data class Error(val message: String) : Result()
     }
 
     suspend operator fun invoke(params: Params): Result {
+        val actor = userRepository.getById(params.actorUserId)
+        if (actor == null || actor.role != UserRole.ADMIN) return Result.NotAuthorized
+
         val record = layawayRepository.getById(params.layawayId)
             ?: return Result.RecordNotFound
         if (record.status != LayawayStatus.COMPLETED) return Result.NotCompleted

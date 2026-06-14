@@ -201,6 +201,8 @@ class LayawayDetailViewModel @Inject constructor(
                     _local.value = _local.value.copy(error = "Layaway is not active")
                 UpdateLayawayUseCase.Result.InsufficientQuantity ->
                     _local.value = _local.value.copy(error = "Not enough product quantity available")
+                UpdateLayawayUseCase.Result.NotAuthorized ->
+                    _local.value = _local.value.copy(error = "Only an admin can edit a layaway")
                 is UpdateLayawayUseCase.Result.Error ->
                     _local.value = _local.value.copy(error = r.message)
             }
@@ -257,6 +259,8 @@ class LayawayDetailViewModel @Inject constructor(
                     snackbarController.showSuccess("Payment deleted")
                     /* Flow auto-refreshes transactions */
                 }
+                DeleteLayawayPaymentUseCase.Result.NotAuthorized ->
+                    _local.value = _local.value.copy(error = "Only an admin can delete a payment")
                 is DeleteLayawayPaymentUseCase.Result.Error ->
                     _local.value = _local.value.copy(error = r.message)
             }

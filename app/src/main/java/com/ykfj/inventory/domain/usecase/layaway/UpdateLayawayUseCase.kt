@@ -2,18 +2,22 @@ package com.ykfj.inventory.domain.usecase.layaway
 
 import com.ykfj.inventory.data.local.db.enums.ActivityAction
 import com.ykfj.inventory.data.local.db.enums.LayawayStatus
+import com.ykfj.inventory.data.local.db.enums.UserRole
 import com.ykfj.inventory.domain.repository.LayawayRepository
 import com.ykfj.inventory.domain.repository.ProductRepository
+import com.ykfj.inventory.domain.repository.UserRepository
 import com.ykfj.inventory.domain.usecase.activitylog.LogActivityUseCase
 import javax.inject.Inject
 
 /**
- * Admin-only: edit customer, quantity, unit price, and due date on an ACTIVE layaway.
- * Quantity changes are reflected in product inventory (delta applied via [adjustQuantity]).
+ * Admin-only (enforced here): edit customer, quantity, unit price, and due date
+ * on an ACTIVE layaway. Quantity changes are reflected in product inventory
+ * (delta applied via [adjustQuantity]).
  */
 class UpdateLayawayUseCase @Inject constructor(
     private val layawayRepository: LayawayRepository,
     private val productRepository: ProductRepository,
+    private val userRepository: UserRepository,
     private val logActivity: LogActivityUseCase,
 ) {
     data class Params(
@@ -30,10 +34,15 @@ class UpdateLayawayUseCase @Inject constructor(
         object RecordNotFound : Result()
         object NotActive : Result()
         object InsufficientQuantity : Result()
+        /** Actor's role is not ADMIN. */
+        object NotAuthorized : Result()
         data class Error(val message: String) : Result()
     }
 
     suspend operator fun invoke(params: Params): Result { return try {
+        val actor = userRepository.getById(params.actorUserId)
+        if (actor == null || actor.role != UserRole.ADMIN) return Result.NotAuthorized
+
         val record = layawayRepository.getById(params.layawayId)
             ?: return Result.RecordNotFound
         if (record.status != LayawayStatus.ACTIVE) return Result.NotActive

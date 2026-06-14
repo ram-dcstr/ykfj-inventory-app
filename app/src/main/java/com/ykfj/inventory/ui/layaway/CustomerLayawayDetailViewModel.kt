@@ -213,6 +213,8 @@ class CustomerLayawayDetailViewModel @Inject constructor(
                     _local.value = _local.value.copy(error = "Record not found")
                 RevertCompletedLayawayUseCase.Result.NotCompleted ->
                     _local.value = _local.value.copy(error = "Layaway is not in COMPLETED state")
+                RevertCompletedLayawayUseCase.Result.NotAuthorized ->
+                    _local.value = _local.value.copy(error = "Only an admin can revert a completed layaway")
                 is RevertCompletedLayawayUseCase.Result.Error ->
                     _local.value = _local.value.copy(error = r.message)
             }
@@ -229,6 +231,8 @@ class CustomerLayawayDetailViewModel @Inject constructor(
                     snackbarController.showSuccess("Payment deleted")
                     /* observeForCustomer auto-refreshes */
                 }
+                DeleteLayawayPaymentUseCase.Result.NotAuthorized ->
+                    _local.value = _local.value.copy(error = "Only an admin can delete a payment")
                 is DeleteLayawayPaymentUseCase.Result.Error ->
                     _local.value = _local.value.copy(error = r.message)
             }
