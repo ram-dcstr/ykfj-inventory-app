@@ -6,14 +6,16 @@ import com.ykfj.inventory.data.local.db.dao.PaluwaganGroupDao
 import com.ykfj.inventory.data.local.db.dao.PaluwaganPaymentDao
 import com.ykfj.inventory.data.local.db.dao.PaluwaganSlotDao
 import com.ykfj.inventory.data.local.db.dao.SoldRecordDao
+import com.ykfj.inventory.data.local.db.dao.UserDao
 import com.ykfj.inventory.data.local.db.enums.ActivityAction
+import com.ykfj.inventory.data.local.db.enums.UserRole
 import com.ykfj.inventory.domain.usecase.activitylog.LogActivityUseCase
 import javax.inject.Inject
 
 /**
  * Hard-deletes archived records of one [ArchivableRecordType] within a date
- * range. Admin-only — call this after a successful CSV export so the data
- * is preserved on disk before it leaves the database forever.
+ * range. Admin-only (enforced here) — call this after a successful CSV export
+ * so the data is preserved on disk before it leaves the database forever.
  *
  * For PALUWAGAN, child slots and payments are also hard-deleted to avoid
  * orphan rows; we look those up per-group rather than relying on a CASCADE
@@ -26,14 +28,25 @@ class PurgeArchivedRecordsUseCase @Inject constructor(
     private val groupDao: PaluwaganGroupDao,
     private val slotDao: PaluwaganSlotDao,
     private val paymentDao: PaluwaganPaymentDao,
+    private val userDao: UserDao,
     private val logActivity: LogActivityUseCase,
 ) {
+    sealed interface Result {
+        /** Number of rows hard-deleted (0 if none matched the range). */
+        data class Success(val deleted: Int) : Result
+        /** Actor's role is not ADMIN. */
+        data object NotAuthorized : Result
+    }
+
     suspend operator fun invoke(
         type: ArchivableRecordType,
         startMillis: Long,
         endMillis: Long,
         actorUserId: String,
-    ): Int {
+    ): Result {
+        val actor = userDao.getById(actorUserId)
+        if (actor == null || actor.role != UserRole.ADMIN) return Result.NotAuthorized
+
         val deleted = when (type) {
             ArchivableRecordType.SOLD ->
                 soldDao.hardDeleteArchivedInRange(startMillis, endMillis)
@@ -60,6 +73,6 @@ class PurgeArchivedRecordsUseCase @Inject constructor(
                 entityType = type.entityType,
             )
         }
-        return deleted
+        return Result.Success(deleted)
     }
 }

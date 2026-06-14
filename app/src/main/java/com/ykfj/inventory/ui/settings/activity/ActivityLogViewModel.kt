@@ -132,9 +132,10 @@ class ActivityLogViewModel @Inject constructor(
     fun export() {
         if (!_ui.value.canExport || _ui.value.isWorking) return
         val f = _filter.value
+        val actorId = sessionManager.currentUser.value?.id ?: return
         _ui.update { it.copy(isWorking = true, infoMessage = null, errorMessage = null) }
         viewModelScope.launch {
-            when (val r = exportLogs(f.startMillis, f.endMillis, f.userId)) {
+            when (val r = exportLogs(f.startMillis, f.endMillis, actorId, f.userId)) {
                 is ExportActivityLogUseCase.Result.Success -> {
                     val msg = "Exported ${r.rowCount} rows → ${r.fileName}"
                     _ui.update { it.copy(isWorking = false, infoMessage = msg) }
@@ -143,6 +144,10 @@ class ActivityLogViewModel @Inject constructor(
                 ExportActivityLogUseCase.Result.NoRecords ->
                     _ui.update {
                         it.copy(isWorking = false, errorMessage = "No log entries in that range")
+                    }
+                ExportActivityLogUseCase.Result.NotAuthorized ->
+                    _ui.update {
+                        it.copy(isWorking = false, errorMessage = "Only an admin can export the activity log")
                     }
                 is ExportActivityLogUseCase.Result.WriteFailed ->
                     _ui.update {

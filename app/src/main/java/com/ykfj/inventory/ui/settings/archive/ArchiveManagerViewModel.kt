@@ -101,10 +101,17 @@ class ArchiveManagerViewModel @Inject constructor(
                 }
                 is ExportArchiveUseCase.Result.Success -> {
                     if (thenPurge) {
-                        val deleted = purgeArchive(s.type, s.startMillis, s.endMillis, actorId)
-                        val msg = "Exported ${result.rowCount} rows → ${result.fileName} · purged $deleted"
-                        _state.update { it.copy(isWorking = false, infoMessage = msg) }
-                        snackbarController.showSuccess(msg)
+                        when (val pr = purgeArchive(s.type, s.startMillis, s.endMillis, actorId)) {
+                            is PurgeArchivedRecordsUseCase.Result.Success -> {
+                                val msg = "Exported ${result.rowCount} rows → ${result.fileName} · purged ${pr.deleted}"
+                                _state.update { it.copy(isWorking = false, infoMessage = msg) }
+                                snackbarController.showSuccess(msg)
+                            }
+                            PurgeArchivedRecordsUseCase.Result.NotAuthorized ->
+                                _state.update {
+                                    it.copy(isWorking = false, errorMessage = "Only admin can purge archives")
+                                }
+                        }
                     } else {
                         val msg = "Exported ${result.rowCount} rows → ${result.fileName}"
                         _state.update { it.copy(isWorking = false, infoMessage = msg) }
