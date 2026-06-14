@@ -70,11 +70,12 @@ fun Application.configureSyncServer(
         // Public: login
         authRoutes(db.userDao(), jwtConfig, loginThrottle)
 
-        // Protected: everything else requires JWT
+        // Protected: everything else requires JWT. The phone client writes
+        // exclusively through /api/sync/push (role-gated inside syncRoutes) and
+        // reads via /api/sync/changes — there is no per-entity REST CRUD surface.
         authenticate("jwt-auth") {
             syncRoutes(db, deviceId)
             imageRoutes(imageStorageManager, db.productImageDao())
-            crudRoutes(db)
         }
     }
 }

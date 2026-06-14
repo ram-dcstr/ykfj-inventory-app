@@ -31,6 +31,13 @@ interface UserRepository {
     /** Replaces the stored hash with a fresh one derived from [newPlaintext]. */
     suspend fun resetPassword(userId: String, newPlaintext: String)
 
+    /**
+     * Sets a new password for [userId] **and** clears the must-change-password
+     * flag — used by the self-service forced-change flow. Returns the updated
+     * [User] (reflecting the cleared flag) or `null` if the user is gone.
+     */
+    suspend fun changeOwnPassword(userId: String, newPlaintext: String): User?
+
     /** Soft delete — flips `is_deleted` and `is_active`. */
     suspend fun deactivate(userId: String)
 }

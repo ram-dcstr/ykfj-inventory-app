@@ -1,8 +1,12 @@
 package com.ykfj.inventory.data.remote.sync
 
 import com.ykfj.inventory.data.local.db.YkfjDatabase
+import com.ykfj.inventory.data.local.db.enums.UserRole
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
+import io.ktor.server.auth.jwt.JWTPrincipal
+import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -47,10 +51,36 @@ fun Route.syncRoutes(db: YkfjDatabase, deviceId: String) {
         }
 
         post("/push") {
-            val payload = runCatching { call.receive<ChangesPayload>() }.getOrElse {
+            val received = runCatching { call.receive<ChangesPayload>() }.getOrElse {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid payload"))
                 return@post
             }
+
+            // Server-side authorization. The phone UI already hides actions a role
+            // can't perform, but a modified client (or a stolen Staff token) could
+            // craft a push for anything — so we strip the privileged entity lists
+            // here rather than trust the client. Dropped rows fail silently; the
+            // rest sync as normal. Mirrors docs/business/Roles-and-Permissions.md:
+            //   • users                          → Admin only
+            //   • metal rates / categories /
+            //     suppliers / paluwagan groups
+            //     & slots                        → Admin or Manager
+            //   • everything else (sales, layaway, damage, customers, paluwagan
+            //     payments, gold purchases, cash, activity logs, product qty/status
+            //     updates that ride along with those) → any authenticated role
+            // NOTE: product *rows* stay writable by all roles because a Staff sale
+            // legitimately updates qty/status. Field-level product authz (blocking
+            // price/weight edits from non-admins) is a known follow-up.
+            val role = call.userRole()
+            val managerOrAdmin = role == UserRole.ADMIN || role == UserRole.MANAGER
+            val payload = received.copy(
+                users = if (role == UserRole.ADMIN) received.users else emptyList(),
+                metal_rates = if (managerOrAdmin) received.metal_rates else emptyList(),
+                categories = if (managerOrAdmin) received.categories else emptyList(),
+                suppliers = if (managerOrAdmin) received.suppliers else emptyList(),
+                paluwagan_groups = if (managerOrAdmin) received.paluwagan_groups else emptyList(),
+                paluwagan_slots = if (managerOrAdmin) received.paluwagan_slots else emptyList(),
+            )
 
             // ── Reference data first (parents of products/transactions) ──────
 
@@ -212,3 +242,12 @@ fun Route.syncRoutes(db: YkfjDatabase, deviceId: String) {
         }
     }
 }
+
+/**
+ * The authenticated caller's role, read from the `role` claim baked into the JWT
+ * at login. Returns `null` if the claim is missing or unrecognised — callers
+ * treat that as the least-privileged case (no privileged entity writes).
+ */
+private fun ApplicationCall.userRole(): UserRole? =
+    principal<JWTPrincipal>()?.payload?.getClaim("role")?.asString()
+        ?.let { runCatching { UserRole.valueOf(it) }.getOrNull() }

@@ -44,6 +44,14 @@ class SessionManager @Inject constructor() {
         lastActivityTimestamp = 0L
     }
 
+    /**
+     * Replace the signed-in user in place (same session) — e.g. after a forced
+     * password change clears `mustChangePassword`. No-op if logged out.
+     */
+    fun updateCurrentUser(user: User) {
+        if (_currentUser.value?.id == user.id) _currentUser.value = user
+    }
+
     fun setIdleTimeout(timeout: IdleTimeout) {
         _idleTimeout.value = timeout
     }

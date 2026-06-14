@@ -35,6 +35,7 @@ data class UserSyncDto(
     val created_at: Long,
     val updated_at: Long,
     val is_deleted: Boolean,
+    val must_change_password: Boolean = false,
 )
 
 // ── Products ──────────────────────────────────────────────────────────────────

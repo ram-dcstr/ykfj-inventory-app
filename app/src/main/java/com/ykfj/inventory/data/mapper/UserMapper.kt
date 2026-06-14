@@ -17,6 +17,7 @@ internal fun UserEntity.toDomain(): User = User(
     isActive = is_active,
     createdAt = created_at,
     updatedAt = updated_at,
+    mustChangePassword = must_change_password,
 )
 
 internal fun User.toEntity(passwordHash: String): UserEntity = UserEntity(
@@ -29,4 +30,5 @@ internal fun User.toEntity(passwordHash: String): UserEntity = UserEntity(
     created_at = createdAt,
     updated_at = updatedAt,
     is_deleted = false,
+    must_change_password = mustChangePassword,
 )

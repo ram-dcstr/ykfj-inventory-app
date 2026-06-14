@@ -55,6 +55,19 @@ class UserRepositoryImpl @Inject constructor(
         syncEnqueuer.enqueueUser(updated, SyncAction.UPDATE)
     }
 
+    override suspend fun changeOwnPassword(userId: String, newPlaintext: String): User? {
+        val existing = userDao.getById(userId) ?: return null
+        val hash = PasswordHasher.hash(newPlaintext)
+        val updated = existing.copy(
+            password_hash = hash,
+            must_change_password = false,
+            updated_at = System.currentTimeMillis(),
+        )
+        userDao.update(updated)
+        syncEnqueuer.enqueueUser(updated, SyncAction.UPDATE)
+        return updated.toDomain()
+    }
+
     override suspend fun deactivate(userId: String) {
         val existing = userDao.getById(userId) ?: return
         val updated = existing.copy(

@@ -83,7 +83,7 @@ import com.ykfj.inventory.data.local.db.entity.UserEntity
         CashMovementEntity::class,
         StockAdjustmentEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 2, to = 3),
@@ -97,6 +97,8 @@ import com.ykfj.inventory.data.local.db.entity.UserEntity
         AutoMigration(from = 9, to = 10),
         // 10→11: adds the stock_adjustments table.
         AutoMigration(from = 10, to = 11),
+        // 11→12: adds users.must_change_password (defaults 0 / false).
+        AutoMigration(from = 11, to = 12),
     ],
 )
 @TypeConverters(Converters::class)
@@ -135,6 +137,6 @@ abstract class YkfjDatabase : RoomDatabase() {
          * downgrade to). Keep this in sync with the annotation's `version = N`
          * line above when you bump the schema.
          */
-        const val SCHEMA_VERSION = 11
+        const val SCHEMA_VERSION = 12
     }
 }

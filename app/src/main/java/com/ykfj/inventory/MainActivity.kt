@@ -41,6 +41,7 @@ import com.ykfj.inventory.data.remote.sync.SyncManager
 import com.ykfj.inventory.data.remote.sync.SyncServerManager
 import com.ykfj.inventory.data.repository.DeviceRoleManager
 import com.ykfj.inventory.domain.sync.DeviceRole
+import com.ykfj.inventory.ui.auth.ForcePasswordChangeScreen
 import com.ykfj.inventory.ui.auth.LoginScreen
 import com.ykfj.inventory.ui.auth.SessionManager
 import com.ykfj.inventory.ui.components.AppSnackbarHost
@@ -108,16 +109,22 @@ class MainActivity : ComponentActivity() {
                     snackbarHost = { AppSnackbarHost(snackbarController) },
                 ) { padding ->
                     Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-                        if (currentUser == null) {
-                            LoginScreen(onLoginSuccess = { /* state auto-updates via Flow */ })
-                        } else {
-                            AppShell(
-                                isExpandedScreen = isExpandedScreen,
-                                sessionManager = sessionManager,
-                                syncManager = syncManager,
-                                syncServerManager = syncServerManager,
-                                deviceRoleManager = deviceRoleManager,
-                            )
+                        val user = currentUser
+                        when {
+                            user == null ->
+                                LoginScreen(onLoginSuccess = { /* state auto-updates via Flow */ })
+                            // Freshly seeded admin must replace the shipped default
+                            // password before reaching the app.
+                            user.mustChangePassword ->
+                                ForcePasswordChangeScreen()
+                            else ->
+                                AppShell(
+                                    isExpandedScreen = isExpandedScreen,
+                                    sessionManager = sessionManager,
+                                    syncManager = syncManager,
+                                    syncServerManager = syncServerManager,
+                                    deviceRoleManager = deviceRoleManager,
+                                )
                         }
                     }
                 }

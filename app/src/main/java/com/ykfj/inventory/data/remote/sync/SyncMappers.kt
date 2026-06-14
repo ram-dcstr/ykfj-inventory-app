@@ -15,6 +15,7 @@ fun UserEntity.toSyncDto() = UserSyncDto(
     created_at = created_at,
     updated_at = updated_at,
     is_deleted = is_deleted,
+    must_change_password = must_change_password,
 )
 
 fun UserSyncDto.toEntity() = UserEntity(
@@ -27,6 +28,7 @@ fun UserSyncDto.toEntity() = UserEntity(
     created_at = created_at,
     updated_at = updated_at,
     is_deleted = is_deleted,
+    must_change_password = must_change_password,
 )
 
 fun ProductEntity.toSyncDto() = ProductSyncDto(

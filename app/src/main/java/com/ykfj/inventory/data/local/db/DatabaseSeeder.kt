@@ -1,6 +1,7 @@
 package com.ykfj.inventory.data.local.db
 
 import at.favre.lib.crypto.bcrypt.BCrypt
+import com.ykfj.inventory.BuildConfig
 import com.ykfj.inventory.data.local.db.entity.CategoryEntity
 import com.ykfj.inventory.data.local.db.entity.CustomerEntity
 import com.ykfj.inventory.data.local.db.entity.DamagedRecordEntity
@@ -31,7 +32,10 @@ class DatabaseSeeder @Inject constructor(
 ) {
     suspend fun seedIfEmpty() {
         seedAdminIfNeeded()
-        seedTestDataIfNeeded()
+        // Demo content (extra users, fake products/customers/records) is for
+        // development only — never ship a real shop a database full of fake
+        // jewellery or extra known-password accounts.
+        if (BuildConfig.DEBUG) seedTestDataIfNeeded()
     }
 
     // ── Admin user ────────────────────────────────────────────────────────────
@@ -49,11 +53,15 @@ class DatabaseSeeder @Inject constructor(
                 role = UserRole.ADMIN,
                 created_at = now,
                 updated_at = now,
+                // Release ships with a well-known bootstrap password, so force the
+                // owner to set their own on first login. Debug keeps admin123
+                // frictionless for development.
+                must_change_password = !BuildConfig.DEBUG,
             ),
         )
     }
 
-    // ── Test data ─────────────────────────────────────────────────────────────
+    // ── Test data (debug builds only) ─────────────────────────────────────────
 
     private suspend fun seedTestDataIfNeeded() {
         if (database.metalRateDao().count() > 0) return

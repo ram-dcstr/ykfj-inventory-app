@@ -17,4 +17,6 @@ data class User(
     val isActive: Boolean,
     val createdAt: Long,
     val updatedAt: Long,
+    /** When `true`, the user must set a new password before reaching the app. */
+    val mustChangePassword: Boolean = false,
 )
