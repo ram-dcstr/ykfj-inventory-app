@@ -2,11 +2,14 @@ package com.ykfj.inventory.domain.usecase.layaway
 
 import com.ykfj.inventory.data.local.db.enums.LayawayStatus
 import com.ykfj.inventory.data.local.db.enums.ProductStatus
+import com.ykfj.inventory.data.local.db.enums.UserRole
 import com.ykfj.inventory.domain.model.LayawayRecord
 import com.ykfj.inventory.domain.model.Product
+import com.ykfj.inventory.domain.model.User
 import com.ykfj.inventory.domain.repository.LayawayRepository
 import com.ykfj.inventory.domain.repository.ProductRepository
 import com.ykfj.inventory.domain.repository.SoldRecordRepository
+import com.ykfj.inventory.domain.repository.UserRepository
 import com.ykfj.inventory.domain.usecase.activitylog.LogActivityUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -27,6 +30,7 @@ class CompleteLayawayUseCaseTest {
     private lateinit var layawayRepository: LayawayRepository
     private lateinit var productRepository: ProductRepository
     private lateinit var soldRecordRepository: SoldRecordRepository
+    private lateinit var userRepository: UserRepository
     private lateinit var logActivity: LogActivityUseCase
     private lateinit var useCase: CompleteLayawayUseCase
 
@@ -35,9 +39,19 @@ class CompleteLayawayUseCaseTest {
         layawayRepository = mockk(relaxUnitFun = true)
         productRepository = mockk(relaxUnitFun = true)
         soldRecordRepository = mockk(relaxUnitFun = true)
+        userRepository = mockk(relaxUnitFun = true)
         logActivity = mockk(relaxUnitFun = true)
-        useCase = CompleteLayawayUseCase(layawayRepository, productRepository, soldRecordRepository, logActivity)
+        useCase = CompleteLayawayUseCase(
+            layawayRepository, productRepository, soldRecordRepository, userRepository, logActivity,
+        )
+        // Default to an authorized admin; the NotAuthorized test overrides this.
+        coEvery { userRepository.getById("actor") } returns user(UserRole.ADMIN)
     }
+
+    private fun user(role: UserRole) = User(
+        id = "actor", username = "u", name = "U", role = role,
+        isActive = true, createdAt = 0, updatedAt = 0,
+    )
 
     private fun record(status: LayawayStatus = LayawayStatus.ACTIVE) = LayawayRecord(
         id = "lay1", productId = "p1", customerId = "c1", createdBy = "actor",
@@ -52,6 +66,12 @@ class CompleteLayawayUseCaseTest {
     }
 
     private fun params() = CompleteLayawayUseCase.Params(layawayId = "lay1", actorUserId = "actor")
+
+    @Test
+    fun `non-admin actor is not authorized`() = runTest {
+        coEvery { userRepository.getById("actor") } returns user(UserRole.MANAGER)
+        assertEquals(CompleteLayawayUseCase.Result.NotAuthorized, useCase(params()))
+    }
 
     @Test
     fun `missing record returns RecordNotFound`() = runTest {

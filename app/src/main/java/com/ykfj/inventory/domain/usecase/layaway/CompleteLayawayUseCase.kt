@@ -4,19 +4,27 @@ import com.ykfj.inventory.data.local.db.enums.ActivityAction
 import com.ykfj.inventory.data.local.db.enums.DiscountType
 import com.ykfj.inventory.data.local.db.enums.LayawayStatus
 import com.ykfj.inventory.data.local.db.enums.ProductStatus
+import com.ykfj.inventory.data.local.db.enums.UserRole
 import com.ykfj.inventory.domain.model.SoldRecord
 import com.ykfj.inventory.domain.repository.LayawayRepository
 import com.ykfj.inventory.domain.repository.ProductRepository
 import com.ykfj.inventory.domain.repository.SoldRecordRepository
+import com.ykfj.inventory.domain.repository.UserRepository
 import com.ykfj.inventory.domain.usecase.activitylog.LogActivityUseCase
 import java.util.UUID
 import javax.inject.Inject
 
-/** Admin-only: manually mark a layaway as COMPLETED and record the sale in the Sold Archive. */
+/**
+ * Admin-only: manually mark a layaway as COMPLETED and record the sale in the
+ * Sold Archive. Role is enforced here in the use case (not just the UI), so any
+ * caller — sync, a future script, a misconfigured screen — is blocked the same
+ * way a Staff user would be (mirrors [CancelLayawayUseCase]).
+ */
 class CompleteLayawayUseCase @Inject constructor(
     private val layawayRepository: LayawayRepository,
     private val productRepository: ProductRepository,
     private val soldRecordRepository: SoldRecordRepository,
+    private val userRepository: UserRepository,
     private val logActivity: LogActivityUseCase,
 ) {
     data class Params(val layawayId: String, val actorUserId: String)
@@ -25,10 +33,15 @@ class CompleteLayawayUseCase @Inject constructor(
         object Success : Result()
         object RecordNotFound : Result()
         object NotActive : Result()
+        /** Actor's role is not ADMIN. */
+        object NotAuthorized : Result()
         data class Error(val message: String) : Result()
     }
 
     suspend operator fun invoke(params: Params): Result { return try {
+        val actor = userRepository.getById(params.actorUserId)
+        if (actor == null || actor.role != UserRole.ADMIN) return Result.NotAuthorized
+
         val record = layawayRepository.getById(params.layawayId)
             ?: return Result.RecordNotFound
         if (record.status != LayawayStatus.ACTIVE) return Result.NotActive

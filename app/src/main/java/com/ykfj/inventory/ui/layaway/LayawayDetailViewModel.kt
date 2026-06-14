@@ -219,6 +219,8 @@ class LayawayDetailViewModel @Inject constructor(
                     _local.value = _local.value.copy(error = "Record not found")
                 CompleteLayawayUseCase.Result.NotActive ->
                     _local.value = _local.value.copy(error = "Layaway is not active")
+                CompleteLayawayUseCase.Result.NotAuthorized ->
+                    _local.value = _local.value.copy(error = "Only an admin can complete a layaway")
                 is CompleteLayawayUseCase.Result.Error ->
                     _local.value = _local.value.copy(error = r.message)
             }
