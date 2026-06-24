@@ -18,8 +18,14 @@ interface ProductRepository {
 
     suspend fun getById(id: String): Product?
 
+    /** Batch lookup — one query for many ids, used to enrich lists without N+1. */
+    suspend fun getByIds(ids: List<String>): List<Product>
+
     /** Lookup that ignores `is_deleted` — used by history views (e.g. melted scraps) that need the original name. */
     suspend fun getByIdAnyState(id: String): Product?
+
+    /** Batch [getByIdAnyState] — one query for many ids. */
+    suspend fun getByIdsAnyState(ids: List<String>): List<Product>
 
     /** Observe a single product — emits null if deleted. Used by the detail screen for live updates. */
     fun observeById(id: String): Flow<Product?>

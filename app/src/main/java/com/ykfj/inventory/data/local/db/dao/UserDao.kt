@@ -17,6 +17,10 @@ interface UserDao {
     @Query("SELECT * FROM users WHERE user_id = :userId AND is_deleted = 0 LIMIT 1")
     suspend fun getById(userId: String): UserEntity?
 
+    /** Batch lookup — one query instead of N `getById` calls when enriching lists. */
+    @Query("SELECT * FROM users WHERE user_id IN (:userIds) AND is_deleted = 0")
+    suspend fun getByIds(userIds: List<String>): List<UserEntity>
+
     @Query("SELECT * FROM users WHERE username = :username AND is_deleted = 0 LIMIT 1")
     suspend fun getByUsername(username: String): UserEntity?
 

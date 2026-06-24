@@ -53,6 +53,11 @@ class InventoryViewModel @Inject constructor(
     val metalRates: StateFlow<List<MetalRate>> = getMetalRates()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** rateId → rate, so [sellingPriceFor] is an O(1) lookup per card instead of a list scan. */
+    private val metalRateById: StateFlow<Map<String, MetalRate>> = metalRates
+        .map { rates -> rates.associateBy { it.id } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
     val categories: StateFlow<List<Category>> = getCategories()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -74,7 +79,7 @@ class InventoryViewModel @Inject constructor(
     /** Computes the display selling price for a product using current metal rates. */
     fun sellingPriceFor(product: Product): Double? = when (product.pricingType) {
         PricingType.WEIGHTED -> {
-            val rate = metalRates.value.firstOrNull { it.id == product.metalRateId }
+            val rate = product.metalRateId?.let { metalRateById.value[it] }
             product.weightGrams?.let { w -> rate?.let { r -> w * r.pricePerGram } }
         }
         PricingType.FIXED -> product.sellingPrice

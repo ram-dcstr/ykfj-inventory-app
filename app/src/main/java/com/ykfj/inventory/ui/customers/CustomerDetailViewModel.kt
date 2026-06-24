@@ -106,8 +106,9 @@ class CustomerDetailViewModel @Inject constructor(
                     combine(txFlows) { it.toList() }
                 }
                 .collect { recordTxPairs ->
-                    val productMap = recordTxPairs.map { it.first.productId }.distinct()
-                        .associateWith { productRepository.getById(it) }
+                    val productMap = productRepository
+                        .getByIds(recordTxPairs.map { it.first.productId }.distinct())
+                        .associateBy { it.id }
                     val summaries = recordTxPairs.map { (r, txs) ->
                         CustomerLayawaySummary(
                             id = r.id,
@@ -138,8 +139,9 @@ class CustomerDetailViewModel @Inject constructor(
                     combine(paymentFlows) { it.toList() }
                 }
                 .collect { slotPaymentPairs ->
-                    val groupMap = slotPaymentPairs.map { it.first.groupId }.distinct()
-                        .associateWith { paluwaganRepository.getGroupById(it) }
+                    val groupMap = paluwaganRepository
+                        .getGroupsByIds(slotPaymentPairs.map { it.first.groupId }.distinct())
+                        .associateBy { it.id }
                     val entries = slotPaymentPairs.mapNotNull { (slot, payments) ->
                         val group = groupMap[slot.groupId] ?: return@mapNotNull null
                         CustomerPaluwaganEntry(

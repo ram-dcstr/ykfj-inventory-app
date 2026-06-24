@@ -20,6 +20,16 @@ interface LayawayTransactionDao {
     )
     fun observeForLayaway(layawayId: String): Flow<List<LayawayTransactionEntity>>
 
+    /** Batch one-shot lookup for many layaways — avoids opening a Flow per record. */
+    @Query(
+        """
+        SELECT * FROM layaway_transactions
+        WHERE layaway_id IN (:layawayIds) AND is_deleted = 0
+        ORDER BY payment_date DESC
+        """,
+    )
+    suspend fun getForLayaways(layawayIds: List<String>): List<LayawayTransactionEntity>
+
     @Query("SELECT * FROM layaway_transactions WHERE transaction_id = :transactionId LIMIT 1")
     suspend fun getById(transactionId: String): LayawayTransactionEntity?
 
@@ -54,17 +64,17 @@ interface LayawayTransactionDao {
      */
     @Query(
         """
-        SELECT COALESCE(SUM(amount_paid), 0.0) FROM layaway_transactions
+        SELECT payment_method AS method, COALESCE(SUM(amount_paid), 0.0) AS total
+        FROM layaway_transactions
         WHERE is_deleted = 0
-          AND payment_method = :paymentMethod
           AND payment_date BETWEEN :startMillis AND :endMillis
+        GROUP BY payment_method
         """,
     )
-    fun observeSumByPaymentMethodForDay(
-        paymentMethod: String,
+    fun observeSumsByPaymentMethodForDay(
         startMillis: Long,
         endMillis: Long,
-    ): Flow<Double>
+    ): Flow<List<PaymentMethodTotal>>
 
     /** Daily Cash: layaway payments matching a payment method on a given day. */
     @Query(

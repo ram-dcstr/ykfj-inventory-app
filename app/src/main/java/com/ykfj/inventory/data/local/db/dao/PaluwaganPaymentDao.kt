@@ -73,18 +73,18 @@ interface PaluwaganPaymentDao {
      */
     @Query(
         """
-        SELECT COALESCE(SUM(amount_paid), 0.0) FROM paluwagan_payments
+        SELECT COALESCE(payment_channel, 'CASH') AS method, COALESCE(SUM(amount_paid), 0.0) AS total
+        FROM paluwagan_payments
         WHERE is_deleted = 0
           AND status != 'UNPAID'
-          AND COALESCE(payment_channel, 'CASH') = :channel
           AND payment_date BETWEEN :startMillis AND :endMillis
+        GROUP BY COALESCE(payment_channel, 'CASH')
         """,
     )
-    fun observeContributionSumByChannelForDay(
-        channel: String,
+    fun observeContributionSumsByChannelForDay(
         startMillis: Long,
         endMillis: Long,
-    ): Flow<Double>
+    ): Flow<List<PaymentMethodTotal>>
 
     @Query("SELECT * FROM paluwagan_payments WHERE payment_id = :paymentId LIMIT 1")
     suspend fun getById(paymentId: String): PaluwaganPaymentEntity?

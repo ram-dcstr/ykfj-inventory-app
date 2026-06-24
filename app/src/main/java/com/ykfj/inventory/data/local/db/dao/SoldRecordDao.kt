@@ -132,23 +132,22 @@ interface SoldRecordDao {
      */
     @Query(
         """
-        SELECT COALESCE(SUM(
+        SELECT s.payment_method AS method, COALESCE(SUM(
             (s.sold_price * s.quantity) - COALESCE(gp.total_paid, 0)
-        ), 0.0)
+        ), 0.0) AS total
         FROM sold_records s
         LEFT JOIN gold_purchase_records gp
             ON gp.linked_sold_record_id = s.sold_id
             AND gp.is_deleted = 0
         WHERE s.is_deleted = 0 AND s.is_archived = 0
-          AND s.payment_method = :paymentMethod
           AND s.sold_date BETWEEN :startMillis AND :endMillis
+        GROUP BY s.payment_method
         """,
     )
-    fun observeSumByPaymentMethodForDay(
-        paymentMethod: String,
+    fun observeSumsByPaymentMethodForDay(
         startMillis: Long,
         endMillis: Long,
-    ): Flow<Double>
+    ): Flow<List<PaymentMethodTotal>>
 
     /** Daily Cash: sales matching a payment method on a given day. Used to expand the row's detail list. */
     @Query(

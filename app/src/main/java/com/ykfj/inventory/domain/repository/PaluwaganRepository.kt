@@ -49,6 +49,9 @@ interface PaluwaganRepository {
 
     suspend fun getGroupById(groupId: String): PaluwaganGroup?
 
+    /** Batch lookup — one query for many group ids, used to enrich lists without N+1. */
+    suspend fun getGroupsByIds(groupIds: List<String>): List<PaluwaganGroup>
+
     suspend fun createGroup(group: PaluwaganGroup)
 
     suspend fun updateGroup(group: PaluwaganGroup)

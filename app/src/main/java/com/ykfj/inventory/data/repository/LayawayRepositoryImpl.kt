@@ -38,6 +38,9 @@ class LayawayRepositoryImpl @Inject constructor(
     override fun observeTransactions(layawayId: String): Flow<List<LayawayTransaction>> =
         layawayTransactionDao.observeForLayaway(layawayId).map { it.map { e -> e.toDomain() } }
 
+    override suspend fun getTransactionsForLayaways(layawayIds: List<String>): List<LayawayTransaction> =
+        layawayTransactionDao.getForLayaways(layawayIds).map { it.toDomain() }
+
     override suspend fun getById(id: String): LayawayRecord? =
         layawayRecordDao.getById(id)?.toDomain()
 

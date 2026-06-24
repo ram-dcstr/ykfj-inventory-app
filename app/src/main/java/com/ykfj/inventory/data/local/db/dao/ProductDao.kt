@@ -82,6 +82,14 @@ abstract class ProductDao {
     @Query("SELECT * FROM products WHERE product_id = :productId LIMIT 1")
     abstract suspend fun getByIdAnyState(productId: String): ProductEntity?
 
+    /** Batch lookup — one query instead of N `getById` calls when enriching lists. */
+    @Query("SELECT * FROM products WHERE product_id IN (:productIds) AND is_deleted = 0")
+    abstract suspend fun getByIds(productIds: List<String>): List<ProductEntity>
+
+    /** Batch lookup that does NOT filter `is_deleted` — for history enrichment. */
+    @Query("SELECT * FROM products WHERE product_id IN (:productIds)")
+    abstract suspend fun getByIdsAnyState(productIds: List<String>): List<ProductEntity>
+
     @Query("SELECT * FROM products WHERE product_id = :productId AND is_deleted = 0")
     abstract fun observeById(productId: String): Flow<ProductEntity?>
 

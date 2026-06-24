@@ -27,6 +27,10 @@ interface CustomerDao {
     @Query("SELECT * FROM customers WHERE customer_id = :customerId AND is_deleted = 0 LIMIT 1")
     suspend fun getById(customerId: String): CustomerEntity?
 
+    /** Batch lookup — one query instead of N `getById` calls when enriching lists. */
+    @Query("SELECT * FROM customers WHERE customer_id IN (:customerIds) AND is_deleted = 0")
+    suspend fun getByIds(customerIds: List<String>): List<CustomerEntity>
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(customer: CustomerEntity)
 

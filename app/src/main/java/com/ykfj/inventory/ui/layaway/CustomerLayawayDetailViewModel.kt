@@ -119,15 +119,17 @@ class CustomerLayawayDetailViewModel @Inject constructor(
             // filter on the list screen navigate into an empty detail view.
             layawayRepository.observeForCustomer(customerId)
                 .collect { records ->
-                    val productMap = records.map { it.productId }.distinct()
-                        .associateWith { productRepository.getById(it) }
+                    val productMap = productRepository.getByIds(records.map { it.productId }.distinct())
+                        .associateBy { it.id }
+                    val txByLayaway = layawayRepository
+                        .getTransactionsForLayaways(records.map { it.id })
+                        .groupBy { it.layawayId }
 
                     val entries = records.map { record ->
-                        val transactions = layawayRepository.observeTransactions(record.id).first()
                         LayawayEntryState(
                             record = record,
                             productName = productMap[record.productId]?.name ?: record.productId,
-                            transactions = transactions,
+                            transactions = txByLayaway[record.id].orEmpty(),
                         )
                     }
                     _local.value = _local.value.copy(entries = entries, isLoading = false)

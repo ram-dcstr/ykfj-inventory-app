@@ -170,10 +170,10 @@ class SoldArchiveViewModel @Inject constructor(
 
     private suspend fun enrichRecords(records: List<SoldRecord>): List<SoldRecordRow> {
         if (records.isEmpty()) return emptyList()
-        val productMap = records.map { it.productId }.distinct()
-            .associateWith { productRepository.getById(it) }
-        val customerMap = records.mapNotNull { it.customerId }.distinct()
-            .associateWith { customerRepository.getById(it) }
+        val productMap = productRepository.getByIds(records.map { it.productId }.distinct())
+            .associateBy { it.id }
+        val customerMap = customerRepository.getByIds(records.mapNotNull { it.customerId }.distinct())
+            .associateBy { it.id }
         return records.map { record ->
             val product = productMap[record.productId]
             val customer = record.customerId?.let { customerMap[it] }

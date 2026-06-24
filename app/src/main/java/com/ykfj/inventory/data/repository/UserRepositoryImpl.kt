@@ -23,6 +23,9 @@ class UserRepositoryImpl @Inject constructor(
     override suspend fun getById(id: String): User? =
         userDao.getById(id)?.toDomain()
 
+    override suspend fun getByIds(ids: List<String>): List<User> =
+        userDao.getByIds(ids).map { it.toDomain() }
+
     override suspend fun getByUsername(username: String): User? =
         userDao.getByUsername(username)?.toDomain()
 

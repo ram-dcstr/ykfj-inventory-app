@@ -14,6 +14,9 @@ interface UserRepository {
 
     suspend fun getById(id: String): User?
 
+    /** Batch lookup — one query for many ids, used to enrich lists without N+1. */
+    suspend fun getByIds(ids: List<String>): List<User>
+
     suspend fun getByUsername(username: String): User?
 
     /**

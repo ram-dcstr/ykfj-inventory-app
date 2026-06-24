@@ -44,8 +44,14 @@ class ProductRepositoryImpl @Inject constructor(
     override suspend fun getById(id: String): Product? =
         productDao.getById(id)?.toDomain()
 
+    override suspend fun getByIds(ids: List<String>): List<Product> =
+        productDao.getByIds(ids).map { it.toDomain() }
+
     override suspend fun getByIdAnyState(id: String): Product? =
         productDao.getByIdAnyState(id)?.toDomain()
+
+    override suspend fun getByIdsAnyState(ids: List<String>): List<Product> =
+        productDao.getByIdsAnyState(ids).map { it.toDomain() }
 
     override fun observeById(id: String): Flow<Product?> =
         productDao.observeById(id).map { it?.toDomain() }

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ykfj.inventory.data.local.AppSettingKeys
 import com.ykfj.inventory.data.local.db.YkfjDatabase
+import com.ykfj.inventory.data.local.db.dao.PaymentMethodTotal
 import com.ykfj.inventory.data.local.db.enums.CashMovementType
 import com.ykfj.inventory.data.local.db.enums.PaymentMethod
 import com.ykfj.inventory.data.local.db.enums.UserRole
@@ -63,53 +64,39 @@ class DailyCashViewModel @Inject constructor(
 
             combine(
                 cashMovementRepository.observeForDay(dayStart),
-                db.soldRecordDao().observeSumByPaymentMethodForDay(PaymentMethod.CASH.name, dayStart, dayEnd),
-                db.soldRecordDao().observeSumByPaymentMethodForDay(PaymentMethod.GCASH.name, dayStart, dayEnd),
-                db.soldRecordDao().observeSumByPaymentMethodForDay(PaymentMethod.ONLINE_BANKING.name, dayStart, dayEnd),
-                db.soldRecordDao().observeSumByPaymentMethodForDay(PaymentMethod.OTHER.name, dayStart, dayEnd),
-                db.layawayTransactionDao().observeSumByPaymentMethodForDay(PaymentMethod.CASH.name, dayStart, dayEnd),
-                db.layawayTransactionDao().observeSumByPaymentMethodForDay(PaymentMethod.GCASH.name, dayStart, dayEnd),
-                db.layawayTransactionDao().observeSumByPaymentMethodForDay(PaymentMethod.ONLINE_BANKING.name, dayStart, dayEnd),
-                db.layawayTransactionDao().observeSumByPaymentMethodForDay(PaymentMethod.OTHER.name, dayStart, dayEnd),
-                db.paluwaganPaymentDao().observeContributionSumByChannelForDay(PaymentMethod.CASH.name, dayStart, dayEnd),
-                db.paluwaganPaymentDao().observeContributionSumByChannelForDay(PaymentMethod.GCASH.name, dayStart, dayEnd),
-                db.paluwaganPaymentDao().observeContributionSumByChannelForDay(PaymentMethod.ONLINE_BANKING.name, dayStart, dayEnd),
-                db.paluwaganPaymentDao().observeContributionSumByChannelForDay(PaymentMethod.OTHER.name, dayStart, dayEnd),
+                db.soldRecordDao().observeSumsByPaymentMethodForDay(dayStart, dayEnd),
+                db.layawayTransactionDao().observeSumsByPaymentMethodForDay(dayStart, dayEnd),
+                db.paluwaganPaymentDao().observeContributionSumsByChannelForDay(dayStart, dayEnd),
                 db.goldPurchaseRecordDao().observeSumForDay(dayStart, dayEnd),
                 sessionManager.currentUser,
             ) { args: Array<Any?> ->
                 @Suppress("UNCHECKED_CAST")
                 val movements = args[0] as List<CashMovement>
-                val cashSales = args[1] as Double
-                val gcashSales = args[2] as Double
-                val onlineBankingSales = args[3] as Double
-                val otherSales = args[4] as Double
-                val cashLayaway = args[5] as Double
-                val gcashLayaway = args[6] as Double
-                val onlineBankingLayaway = args[7] as Double
-                val otherLayaway = args[8] as Double
-                val cashPaluwagan = args[9] as Double
-                val gcashPaluwagan = args[10] as Double
-                val onlineBankingPaluwagan = args[11] as Double
-                val otherPaluwagan = args[12] as Double
-                val goldPurchasesTotal = args[13] as Double
-                val user = args[14] as com.ykfj.inventory.domain.model.User?
+                val soldByMethod = (args[1] as List<PaymentMethodTotal>).associate { it.method to it.total }
+                val layawayByMethod = (args[2] as List<PaymentMethodTotal>).associate { it.method to it.total }
+                val paluwaganByMethod = (args[3] as List<PaymentMethodTotal>).associate { it.method to it.total }
+                val goldPurchasesTotal = args[4] as Double
+                val user = args[5] as com.ykfj.inventory.domain.model.User?
+
+                // A method with no rows on this day isn't in the map → 0.0, which
+                // matches the old per-method query's COALESCE(..., 0.0).
+                fun Map<String, Double>.of(method: PaymentMethod) = this[method.name] ?: 0.0
 
                 buildState(
                     dayStart = dayStart,
                     movements = movements,
-                    cashSales = cashSales,
-                    gcashSales = gcashSales,
-                    onlineBankingSales = onlineBankingSales,
-                    otherSales = otherSales,
-                    cashLayaway = cashLayaway,
-                    gcashLayaway = gcashLayaway,
-                    onlineBankingLayaway = onlineBankingLayaway,
-                    otherLayaway = otherLayaway,
-                    cashPaluwagan = cashPaluwagan,
-                    gcashPaluwagan = gcashPaluwagan,
-                    onlineBankingPaluwagan = onlineBankingPaluwagan,
-                    otherPaluwagan = otherPaluwagan,
+                    cashSales = soldByMethod.of(PaymentMethod.CASH),
+                    gcashSales = soldByMethod.of(PaymentMethod.GCASH),
+                    onlineBankingSales = soldByMethod.of(PaymentMethod.ONLINE_BANKING),
+                    otherSales = soldByMethod.of(PaymentMethod.OTHER),
+                    cashLayaway = layawayByMethod.of(PaymentMethod.CASH),
+                    gcashLayaway = layawayByMethod.of(PaymentMethod.GCASH),
+                    onlineBankingLayaway = layawayByMethod.of(PaymentMethod.ONLINE_BANKING),
+                    otherLayaway = layawayByMethod.of(PaymentMethod.OTHER),
+                    cashPaluwagan = paluwaganByMethod.of(PaymentMethod.CASH),
+                    gcashPaluwagan = paluwaganByMethod.of(PaymentMethod.GCASH),
+                    onlineBankingPaluwagan = paluwaganByMethod.of(PaymentMethod.ONLINE_BANKING),
+                    otherPaluwagan = paluwaganByMethod.of(PaymentMethod.OTHER),
                     goldPurchasesTotal = goldPurchasesTotal,
                     role = user?.role,
                 )

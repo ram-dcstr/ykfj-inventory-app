@@ -27,6 +27,9 @@ interface LayawayRepository {
 
     fun observeTransactions(layawayId: String): Flow<List<LayawayTransaction>>
 
+    /** One-shot batch read of transactions for many layaways — avoids a Flow per record. */
+    suspend fun getTransactionsForLayaways(layawayIds: List<String>): List<LayawayTransaction>
+
     suspend fun getById(id: String): LayawayRecord?
 
     /** Returns the single ACTIVE layaway for a product, or null if none. */

@@ -12,6 +12,9 @@ interface CustomerRepository {
 
     suspend fun getById(id: String): Customer?
 
+    /** Batch lookup — one query for many ids, used to enrich lists without N+1. */
+    suspend fun getByIds(ids: List<String>): List<Customer>
+
     suspend fun upsert(customer: Customer)
 
     /** Credit score adjustments (+1 on-time, −3 layaway late, −2 paluwagan late). */

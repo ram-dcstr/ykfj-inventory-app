@@ -139,10 +139,10 @@ class LayawayViewModel @Inject constructor(
 
     private suspend fun buildGroups(records: List<LayawayRecord>): List<CustomerLayawayGroup> {
         if (records.isEmpty()) return emptyList()
-        val productMap = records.map { it.productId }.distinct()
-            .associateWith { productRepository.getById(it) }
-        val customerMap = records.map { it.customerId }.distinct()
-            .associateWith { customerRepository.getById(it) }
+        val productMap = productRepository.getByIds(records.map { it.productId }.distinct())
+            .associateBy { it.id }
+        val customerMap = customerRepository.getByIds(records.map { it.customerId }.distinct())
+            .associateBy { it.id }
 
         return records
             .groupBy { it.customerId }

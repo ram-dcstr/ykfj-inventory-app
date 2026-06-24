@@ -59,6 +59,9 @@ class PaluwaganRepositoryImpl @Inject constructor(
     override suspend fun getGroupById(groupId: String): PaluwaganGroup? =
         groupDao.getById(groupId)?.toDomain()
 
+    override suspend fun getGroupsByIds(groupIds: List<String>): List<PaluwaganGroup> =
+        groupDao.getByIds(groupIds).map { it.toDomain() }
+
     override suspend fun createGroup(group: PaluwaganGroup) {
         val entity = group.toEntity()
         groupDao.insert(entity)

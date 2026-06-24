@@ -42,6 +42,10 @@ interface PaluwaganGroupDao {
     @Query("SELECT * FROM paluwagan_groups WHERE group_id = :groupId AND is_deleted = 0 LIMIT 1")
     suspend fun getById(groupId: String): PaluwaganGroupEntity?
 
+    /** Batch lookup — one query instead of N `getById` calls when enriching lists. */
+    @Query("SELECT * FROM paluwagan_groups WHERE group_id IN (:groupIds) AND is_deleted = 0")
+    suspend fun getByIds(groupIds: List<String>): List<PaluwaganGroupEntity>
+
     @Query("SELECT * FROM paluwagan_groups WHERE group_id = :groupId AND is_deleted = 0")
     fun observeById(groupId: String): Flow<PaluwaganGroupEntity?>
 

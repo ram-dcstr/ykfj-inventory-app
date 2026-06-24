@@ -53,12 +53,10 @@ class StockAdjustmentsViewModel @Inject constructor(
         if (records.isEmpty()) return emptyList()
         // A write-off can zero out a product, which soft-deletes it — use the
         // deletion-agnostic lookup so the name still resolves for history.
-        val productNames = records.map { it.productId }.distinct().associateWith { id ->
-            productRepository.getByIdAnyState(id)?.name
-        }
-        val userNames = records.map { it.recordedBy }.distinct().associateWith { id ->
-            userRepository.getById(id)?.name
-        }
+        val productNames = productRepository.getByIdsAnyState(records.map { it.productId }.distinct())
+            .associate { it.id to it.name }
+        val userNames = userRepository.getByIds(records.map { it.recordedBy }.distinct())
+            .associate { it.id to it.name }
         return records.map { r ->
             StockAdjustmentRow(
                 id = r.id,

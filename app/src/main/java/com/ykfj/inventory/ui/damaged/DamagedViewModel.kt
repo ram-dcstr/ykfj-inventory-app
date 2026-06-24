@@ -159,10 +159,9 @@ class DamagedViewModel @Inject constructor(
         if (records.isEmpty()) return emptyList()
         // Melted view needs the soft-deleted product row; the active view uses the
         // standard `getById` which filters them out (and shouldn't see them anyway).
-        val productMap = records.map { it.productId }.distinct().associateWith { id ->
-            if (isMeltedView) productRepository.getByIdAnyState(id)
-            else productRepository.getById(id)
-        }
+        val ids = records.map { it.productId }.distinct()
+        val productMap = (if (isMeltedView) productRepository.getByIdsAnyState(ids)
+            else productRepository.getByIds(ids)).associateBy { it.id }
         return records.map { record ->
             val product = productMap[record.productId]
             DamagedRecordRow(

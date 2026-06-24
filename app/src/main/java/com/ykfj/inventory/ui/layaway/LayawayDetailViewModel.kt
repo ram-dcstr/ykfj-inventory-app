@@ -115,8 +115,8 @@ class LayawayDetailViewModel @Inject constructor(
     private fun loadOtherLayaways(current: LayawayRecord) {
         viewModelScope.launch {
             val all = layawayRepository.observeForCustomer(current.customerId).first()
-            val productMap = all.map { it.productId }.distinct()
-                .associateWith { productRepository.getById(it) }
+            val productMap = productRepository.getByIds(all.map { it.productId }.distinct())
+                .associateBy { it.id }
             val others = all
                 .filter { it.status == LayawayStatus.ACTIVE && it.id != layawayId }
                 .map { r ->

@@ -25,6 +25,9 @@ class CustomerRepositoryImpl @Inject constructor(
     override suspend fun getById(id: String): Customer? =
         customerDao.getById(id)?.toDomain()
 
+    override suspend fun getByIds(ids: List<String>): List<Customer> =
+        customerDao.getByIds(ids).map { it.toDomain() }
+
     override suspend fun upsert(customer: Customer) {
         val existing = customerDao.getById(customer.id)
         val entity = customer.toEntity()

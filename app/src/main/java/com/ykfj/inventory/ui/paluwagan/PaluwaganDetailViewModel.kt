@@ -78,9 +78,8 @@ class PaluwaganDetailViewModel @Inject constructor(
     ) { group, slots, payments, user ->
         val allCustomerIds = (slots.map { it.customerId } +
             slots.mapNotNull { it.originalCustomerId }).distinct()
-        val customerMap = allCustomerIds.associateWith { id ->
-            customerRepository.getById(id)?.name ?: id
-        }
+        val customerNames = customerRepository.getByIds(allCustomerIds).associate { it.id to it.name }
+        val customerMap = allCustomerIds.associateWith { id -> customerNames[id] ?: id }
 
         val paymentsBySlot: Map<String, List<PaluwaganPayment>> =
             payments.groupBy { it.slotId }
